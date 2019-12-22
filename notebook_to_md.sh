@@ -2,8 +2,8 @@
 
 cd "${BASH_SOURCE%/*}"
 
-# Execute all notebooks
-#jupyter nbconvert --to notebook --inplace --execute notebooks/*.ipynb
+jupyter nbconvert --output-dir='./notebooks/markdown' --to markdown notebooks/original/*.ipynb
 
-# ipynb to markdown, exluding code cells.
-jupyter nbconvert --output-dir='.' --to markdown notebooks/*.ipynb
+git add --all
+git commit -m 'auto-commit'
+git push
