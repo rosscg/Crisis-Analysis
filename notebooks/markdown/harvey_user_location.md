@@ -22,6 +22,13 @@ for d in dimensions:
 print("{} Accounts coded by primary coder, {} by secondary coder.".format(account_codings.count(), account_codings_secondary.count()))
 ```
 
+    Coding Dimension: 'Local'
+    Subject: user
+    Classes: ['Unsure', 'Non-Witness', 'Witness']
+    
+    1500 Accounts coded by primary coder, 151 by secondary coder.
+
+
 
 ```python
 # Get all Users coded by primary coder:
@@ -29,7 +36,7 @@ print("{} Accounts coded by primary coder, {} by secondary coder.".format(accoun
 users = User.objects.filter(coding_for_user__coding_id=1, 
                             coding_for_user__data_code__data_code_id__gt=0)
 users_df = pd.DataFrame(list(users.values()))
-#users_df.count()
+users_df.count()
 ```
 
 
