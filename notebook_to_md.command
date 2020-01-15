@@ -4,6 +4,7 @@ cd "${BASH_SOURCE%/*}"
 
 rsync -rPz --include="*.ipynb" --exclude="*" --delete-excluded rosles@gales.cs.ox.ac.uk:projects/crisis-data/notebooks/ notebooks/
 
+# Create Markdown copies of notebooks for Github viewing
 rm -rf ./notebooks/markdown/*
 jupyter nbconvert --output-dir='./notebooks/markdown' --to markdown notebooks/*.ipynb
 

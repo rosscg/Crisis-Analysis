@@ -40,6 +40,63 @@ users_df.count()
 ```
 
 
+
+
+    added_at                             1500
+    betweenness_centrality                878
+    closeness_centrality                  878
+    created_at                           1500
+    data_source                          1500
+    default_profile                      1500
+    default_profile_image                1500
+    degree_centrality                     878
+    description                          1500
+    eigenvector_centrality                878
+    favourites_count                     1500
+    followers_count                      1500
+    friends_count                        1500
+    geo_enabled                          1500
+    has_extended_profile                 1500
+    id                                   1500
+    in_degree                            1500
+    is_deleted                              0
+    is_deleted_observed                     0
+    is_translation_enabled               1500
+    katz_centrality                         0
+    lang                                 1500
+    listed_count                         1500
+    load_centrality                       878
+    location                             1500
+    name                                 1500
+    needs_phone_verification                0
+    old_screen_name                        96
+    out_degree                           1500
+    protected                            1500
+    ratio_detected                       1479
+    ratio_media                          1479
+    ratio_original                       1479
+    screen_name                          1500
+    statuses_count                       1500
+    suspended                               0
+    time_zone                             921
+    translator_type                      1500
+    tweets_per_hour                      1479
+    undirected_eigenvector_centrality     878
+    url                                   814
+    user_class                           1500
+    user_followers                          0
+    user_followers_update                   0
+    user_following                          0
+    user_following_update                   0
+    user_id                              1500
+    user_network_update_observed_at         0
+    utc_offset                            921
+    verified                             1500
+    dtype: int64
+
+
+
+
 ```python
 # Get all authors from coded Tweets:
 #coded_tweets = Tweet.objects.filter(coding_for_tweet__coding_id=1, 
@@ -139,6 +196,8 @@ def is_local(location, boxes, known_localities=[]):
     Check whether a location string falls within a set of 
     bounding boxes using Googlemaps API.
     '''
+    if not location:
+        return False
     # Check known localities first to save on API requests:
     for x in known_localities:
         if x in location:
@@ -153,9 +212,9 @@ def is_local(location, boxes, known_localities=[]):
         gmaps = googlemaps.Client(key=auth['apikeys']['googlemaps'])
         #########################################################
         ####### OVERRIDE API OBJECT TO PREVENT API CALLS: #######
-        #geocode_result = gmaps.geocode(location)
-        geocode_result = False
-        print('WARNING -- API DISABLED')
+        geocode_result = gmaps.geocode(location)
+        #geocode_result = False
+        #print('WARNING -- API DISABLED')
         #########################################################
         #########################################################
         if geocode_result:
@@ -203,6 +262,7 @@ As this data field has been deprecated by Twitter, it will not be available in n
 ```python
 # Create column for profiles in relevant time zone:
 timezone = 'Central Time (US & Canada)'
+
 users_df['local_timezone'] = users_df.time_zone == timezone
 users_df = users_df.drop(['time_zone', 'utc_offset'], axis=1)
 ```
@@ -240,7 +300,6 @@ for u in users:
         if is_in_bounding_box(coords, boxes):
             users_df.loc[users_df['screen_name'] == u, 'tweet_from_locality'] = True
             break
-
 ```
 
 #### Combination Columns
@@ -271,21 +330,30 @@ path = 'data/harvey_user_location/temp_users_df.csv'
 
 #users_df.to_csv(path)
 
-users_df = pd.read_csv(path, index_col=0) 
+#users_df = pd.read_csv(path, index_col=0) 
 #users_df = users_df.drop(['Unnamed: 0.1'], axis=1)
 
 # Reading currently splits a row, delete rogue row:
-if users_df.shape[0] == 932:
-    print('Dropping row 222, to verify')
-    users_df = users_df.drop(users_df.index[222])
-print(users_df.shape)
+#if users_df.shape[0] == 1500:
+#    print('Dropping row 222, to verify')
+#    users_df = users_df.drop(users_df.index[222])
+#print(users_df.shape)
 
 ########################################
 ########################################
 ########################################
 ```
 
-    (931, 58)
+
+```python
+users_df.shape
+```
+
+
+
+
+    (1500, 56)
+
 
 
 #### Compare Stand-In Metrics
@@ -301,7 +369,7 @@ from sklearn.metrics import classification_report
 
 # Columns to compare:
 columns = ['tweet_from_locality', 'local_timezone', 'local_profile_location', 
-            'local_profile_location_manual', 
+            #'local_profile_location_manual', 
            'three_local_metrics', 'local_tw_and_local_profile', 'local_tw_and_local_tz', 
            'local_tz_and_local_profile']
 
@@ -331,8 +399,8 @@ print('Total negative cases: ', users_df['coded_as_witness'].count() - users_df[
 results
 ```
 
-    Total positive cases:  248
-    Total negative cases:  683
+    Total positive cases:  378
+    Total negative cases:  1122
 
 
 
@@ -369,82 +437,72 @@ results
     <tr>
       <th>0</th>
       <td>tweet_from_locality</td>
-      <td>295</td>
+      <td>462</td>
       <td>0.53</td>
-      <td>0.62</td>
-      <td>0.75</td>
+      <td>0.65</td>
       <td>0.77</td>
-      <td>0.75</td>
+      <td>0.79</td>
+      <td>0.77</td>
     </tr>
     <tr>
       <th>1</th>
       <td>local_timezone</td>
-      <td>222</td>
-      <td>0.38</td>
-      <td>0.34</td>
-      <td>0.68</td>
-      <td>0.67</td>
-      <td>0.68</td>
+      <td>347</td>
+      <td>0.40</td>
+      <td>0.37</td>
+      <td>0.70</td>
+      <td>0.69</td>
+      <td>0.70</td>
     </tr>
     <tr>
       <th>2</th>
       <td>local_profile_location</td>
-      <td>246</td>
-      <td>0.63</td>
-      <td>0.62</td>
-      <td>0.80</td>
-      <td>0.80</td>
-      <td>0.80</td>
+      <td>394</td>
+      <td>0.64</td>
+      <td>0.67</td>
+      <td>0.82</td>
+      <td>0.82</td>
+      <td>0.82</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>local_profile_location_manual</td>
-      <td>242</td>
-      <td>0.64</td>
-      <td>0.62</td>
-      <td>0.81</td>
-      <td>0.81</td>
-      <td>0.81</td>
+      <td>three_local_metrics</td>
+      <td>105</td>
+      <td>0.69</td>
+      <td>0.19</td>
+      <td>0.77</td>
+      <td>0.76</td>
+      <td>0.77</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>three_local_metrics</td>
-      <td>67</td>
-      <td>0.69</td>
-      <td>0.19</td>
-      <td>0.76</td>
-      <td>0.74</td>
-      <td>0.76</td>
+      <td>local_tw_and_local_profile</td>
+      <td>277</td>
+      <td>0.64</td>
+      <td>0.47</td>
+      <td>0.80</td>
+      <td>0.79</td>
+      <td>0.80</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>local_tw_and_local_profile</td>
-      <td>175</td>
-      <td>0.62</td>
-      <td>0.44</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.78</td>
-    </tr>
-    <tr>
-      <th>6</th>
       <td>local_tw_and_local_tz</td>
-      <td>97</td>
-      <td>0.61</td>
-      <td>0.24</td>
-      <td>0.76</td>
-      <td>0.73</td>
-      <td>0.76</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>local_tz_and_local_profile</td>
-      <td>94</td>
-      <td>0.67</td>
+      <td>150</td>
+      <td>0.63</td>
       <td>0.25</td>
       <td>0.77</td>
       <td>0.75</td>
       <td>0.77</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>local_tz_and_local_profile</td>
+      <td>154</td>
+      <td>0.66</td>
+      <td>0.27</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.78</td>
     </tr>
   </tbody>
 </table>
@@ -491,16 +549,16 @@ users_df.head()
       <th>description</th>
       <th>eigenvector_centrality</th>
       <th>...</th>
+      <th>user_network_update_observed_at</th>
+      <th>verified</th>
       <th>local_profile_location</th>
       <th>local_timezone</th>
-      <th>coded_as</th>
       <th>coded_as_witness</th>
       <th>tweet_from_locality</th>
       <th>three_local_metrics</th>
       <th>local_tw_and_local_profile</th>
       <th>local_tw_and_local_tz</th>
       <th>local_tz_and_local_profile</th>
-      <th>local_profile_location_manual</th>
     </tr>
   </thead>
   <tbody>
@@ -517,10 +575,10 @@ users_df.head()
       <td>If You Want To Live A Happy Life ❇ change your...</td>
       <td>3.905631e-07</td>
       <td>...</td>
+      <td>None</td>
+      <td>False</td>
       <td>False</td>
       <td>True</td>
-      <td>Non-Witness</td>
-      <td>False</td>
       <td>False</td>
       <td>False</td>
       <td>False</td>
@@ -541,9 +599,9 @@ users_df.head()
       <td>Employee Giving PM @Microsoft.A daydreamer w/ ...</td>
       <td>1.785776e-07</td>
       <td>...</td>
+      <td>None</td>
       <td>False</td>
       <td>False</td>
-      <td>Non-Witness</td>
       <td>False</td>
       <td>False</td>
       <td>False</td>
@@ -565,12 +623,12 @@ users_df.head()
       <td>Making an impact isn’t something reserved for ...</td>
       <td>8.518251e-14</td>
       <td>...</td>
+      <td>None</td>
       <td>False</td>
       <td>False</td>
-      <td>Non-Witness</td>
+      <td>False</td>
       <td>False</td>
       <td>True</td>
-      <td>False</td>
       <td>False</td>
       <td>False</td>
       <td>False</td>
@@ -589,9 +647,9 @@ users_df.head()
       <td>Eyeing global entropy through a timeline windo...</td>
       <td>4.315565e-05</td>
       <td>...</td>
+      <td>None</td>
       <td>False</td>
       <td>False</td>
-      <td>Non-Witness</td>
       <td>False</td>
       <td>False</td>
       <td>False</td>
@@ -613,9 +671,9 @@ users_df.head()
       <td>Producer. Show Control Designer. Project Coord...</td>
       <td>NaN</td>
       <td>...</td>
+      <td>None</td>
       <td>False</td>
       <td>False</td>
-      <td>Non-Witness</td>
       <td>False</td>
       <td>False</td>
       <td>False</td>
@@ -626,7 +684,7 @@ users_df.head()
     </tr>
   </tbody>
 </table>
-<p>5 rows × 58 columns</p>
+<p>5 rows × 56 columns</p>
 </div>
 
 
@@ -651,54 +709,6 @@ users_df['has_url'] = users_df['url'].notnull()
 # User has changed screen_name during collection period:
 users_df['changed_screen_name'] = users_df['old_screen_name'].notnull()
 ```
-
-
-    ----------------------------------------------------------
-
-    KeyError                 Traceback (most recent call last)
-
-    <ipython-input-219-1694d4515c95> in <module>
-          9 # translator_type exists:
-         10 users_df['has_translator_type'] = users_df['translator_type'] != 'none'
-    ---> 11 users_df = users_df.drop(['lang'], axis=1)
-         12 
-         13 # Url in profile:
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/frame.py in drop(self, labels, axis, index, columns, level, inplace, errors)
-       3938                                            index=index, columns=columns,
-       3939                                            level=level, inplace=inplace,
-    -> 3940                                            errors=errors)
-       3941 
-       3942     @rewrite_axis_style_signature('mapper', [('copy', True),
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/generic.py in drop(self, labels, axis, index, columns, level, inplace, errors)
-       3778         for axis, labels in axes.items():
-       3779             if labels is not None:
-    -> 3780                 obj = obj._drop_axis(labels, axis, level=level, errors=errors)
-       3781 
-       3782         if inplace:
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/generic.py in _drop_axis(self, labels, axis, level, errors)
-       3810                 new_axis = axis.drop(labels, level=level, errors=errors)
-       3811             else:
-    -> 3812                 new_axis = axis.drop(labels, errors=errors)
-       3813             result = self.reindex(**{axis_name: new_axis})
-       3814 
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/indexes/base.py in drop(self, labels, errors)
-       4963             if errors != 'ignore':
-       4964                 raise KeyError(
-    -> 4965                     '{} not found in axis'.format(labels[mask]))
-       4966             indexer = indexer[~mask]
-       4967         return self.delete(indexer)
-
-
-    KeyError: "['lang'] not found in axis"
-
 
 
 ```python
@@ -729,6 +739,11 @@ for col in users_df.columns:
 
 
 ```python
+
+```
+
+
+```python
 # Create columns to represent age of account at time of detection, and how soon
 # after the beginning of the event that the account was first detected.
 
@@ -736,6 +751,7 @@ from datetime import datetime
 
 # Calculate whole days between two dates:
 def get_age_in_days(date_str, anchor_date):
+    date_str = str(date_str) # In case date_str is already a datetime obj
     if date_str[-3:-2] == ":":
         date_str = date_str[:-3] + date_str[-2:]
     try:
@@ -764,77 +780,8 @@ users_df['day_of_detection'] = users_df['added_at'].apply(get_age_in_days, args=
 ########## Temporary handling of row with nan for ########################################
 ########## geo_enabled, has_extended_profile, is_translation_enabled, verified: ##########
 ##########################################################################################
-users_df = users_df.drop(users_df.index[221])
+#users_df = users_df.drop(users_df.index[221])
 ```
-
-
-    ----------------------------------------------------------
-
-    KeyError                 Traceback (most recent call last)
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/indexes/base.py in get_loc(self, key, method, tolerance)
-       2656             try:
-    -> 2657                 return self._engine.get_loc(key)
-       2658             except KeyError:
-
-
-    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
-
-
-    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
-
-
-    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
-
-
-    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
-
-
-    KeyError: 221
-
-    
-    During handling of the above exception, another exception occurred:
-
-
-    KeyError                 Traceback (most recent call last)
-
-    <ipython-input-864-6d0dcdaaf6e8> in <module>
-          3 ########## geo_enabled, has_extended_profile, is_translation_enabled, verified: ##########
-          4 ##########################################################################################
-    ----> 5 users_df[221]
-          6 #users_df = users_df.drop(users_df.index[221])
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/frame.py in __getitem__(self, key)
-       2925             if self.columns.nlevels > 1:
-       2926                 return self._getitem_multilevel(key)
-    -> 2927             indexer = self.columns.get_loc(key)
-       2928             if is_integer(indexer):
-       2929                 indexer = [indexer]
-
-
-    ~/projects/crisis-data/venv/lib/python3.6/site-packages/pandas/core/indexes/base.py in get_loc(self, key, method, tolerance)
-       2657                 return self._engine.get_loc(key)
-       2658             except KeyError:
-    -> 2659                 return self._engine.get_loc(self._maybe_cast_indexer(key))
-       2660         indexer = self.get_indexer([key], method=method, tolerance=tolerance)
-       2661         if indexer.ndim > 1 or indexer.size > 1:
-
-
-    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
-
-
-    pandas/_libs/index.pyx in pandas._libs.index.IndexEngine.get_loc()
-
-
-    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
-
-
-    pandas/_libs/hashtable_class_helper.pxi in pandas._libs.hashtable.PyObjectHashTable.get_item()
-
-
-    KeyError: 221
-
 
 
 ```python
@@ -851,10 +798,7 @@ for col in users_df.columns:
     [1 3 0] 
     
     user_class
-    [2. 1.] 
-    
-    coded_as
-    ['Non-Witness' 'Witness' 'Unsure'] 
+    [2 1] 
     
     day_of_detection
     [3 5 1 2 6 4 7 8] 
@@ -889,49 +833,47 @@ for col in users_df.columns:
 ```
 
     default_profile
-    [0 1]
+    [False  True]
     default_profile_image
-    [0 1]
+    [False  True]
     geo_enabled
-    [1 0]
+    [ True False]
     has_extended_profile
-    [1 0]
+    [ True False]
     is_translation_enabled
-    [0 1]
+    [False  True]
     verified
-    [0 1]
+    [False  True]
     local_profile_location
-    [0 1]
+    [False  True]
     local_timezone
-    [1 0]
+    [ True False]
     coded_as_witness
-    [0 1]
+    [False  True]
     tweet_from_locality
-    [0 1]
+    [False  True]
     three_local_metrics
-    [0 1]
+    [False  True]
     local_tw_and_local_profile
-    [0 1]
+    [False  True]
     local_tw_and_local_tz
-    [0 1]
+    [False  True]
     local_tz_and_local_profile
-    [0 1]
-    local_profile_location_manual
-    [0 1]
+    [False  True]
     lang_is_en
-    [1 0]
+    [ True False]
     has_translator_type
-    [1 0]
-    is_user_class_2
-    [0 1]
-    is_data_source_1
-    [1 0]
-    is_data_source_3
-    [0 1]
+    [ True False]
     has_url
-    [0 1]
+    [False  True]
     changed_screen_name
-    [0 1]
+    [False  True]
+    is_user_class_2
+    [False  True]
+    is_data_source_1
+    [ True False]
+    is_data_source_3
+    [False  True]
 
 
 
@@ -940,6 +882,32 @@ for col in users_df.columns:
 users_df.loc[users_df['in_degree'] < 0, 'in_degree'] = 0
 users_df.loc[users_df['out_degree'] < 0, 'out_degree'] = 0
 ```
+
+
+```python
+########################################
+########################################
+## Write/read dataframe to temp file ###
+########################################
+########################################
+
+import pandas as pd
+path = 'data/harvey_user_location/cleaned_users_df.csv'
+
+users_df.to_csv(path)
+
+#users_df = pd.read_csv(path, index_col=0) 
+#users_df = users_df.drop(['Unnamed: 0.1'], axis=1)
+
+print(users_df.shape)
+
+########################################
+########################################
+########################################
+```
+
+    (1499, 50)
+
 
 ## Classification
 
@@ -970,14 +938,13 @@ users_df.columns
            'old_screen_name', 'out_degree', 'ratio_detected', 'ratio_original',
            'screen_name', 'statuses_count', 'tweets_per_hour',
            'undirected_eigenvector_centrality', 'url', 'user_id', 'verified',
-           'local_profile_location', 'local_timezone', 'coded_as',
-           'coded_as_witness', 'tweet_from_locality', 'three_local_metrics',
+           'local_profile_location', 'local_timezone', 'coded_as_witness',
+           'tweet_from_locality', 'three_local_metrics',
            'local_tw_and_local_profile', 'local_tw_and_local_tz',
-           'local_tz_and_local_profile', 'local_profile_location_manual',
-           'description_length', 'lang_is_en', 'has_translator_type',
-           'account_age', 'day_of_detection', 'is_user_class_2',
-           'is_data_source_1', 'is_data_source_3', 'has_url',
-           'changed_screen_name'],
+           'local_tz_and_local_profile', 'description_length', 'lang_is_en',
+           'has_translator_type', 'has_url', 'changed_screen_name', 'account_age',
+           'day_of_detection', 'is_user_class_2', 'is_data_source_1',
+           'is_data_source_3'],
           dtype='object')
 
 
@@ -994,8 +961,7 @@ The dataframe is also checked for any columns that were not cleaned appropriatel
 ```python
 # Excluded features:
 dropped_cols = ['added_at', 'description', 'created_at', 'id',  'location', 'name', 'url', 
-                'screen_name', 'user_id', 'coded_as', 'coded_as_witness', 'old_screen_name',
-                'local_profile_location_manual']
+                'screen_name', 'user_id', 'coded_as_witness', 'old_screen_name']
 
 xVar = users_df.drop(dropped_cols, axis=1)
 
@@ -1010,8 +976,8 @@ print (X_test.shape, y_test.shape)
 xVar.head()
 ```
 
-    (743, 39) (743,)
-    (186, 39) (186,)
+    (1199, 39) (1199,)
+    (300, 39) (300,)
 
 
 
@@ -1067,13 +1033,13 @@ xVar.head()
       <th>description_length</th>
       <th>lang_is_en</th>
       <th>has_translator_type</th>
+      <th>has_url</th>
+      <th>changed_screen_name</th>
       <th>account_age</th>
       <th>day_of_detection</th>
       <th>is_user_class_2</th>
       <th>is_data_source_1</th>
       <th>is_data_source_3</th>
-      <th>has_url</th>
-      <th>changed_screen_name</th>
     </tr>
   </thead>
   <tbody>
@@ -1085,19 +1051,19 @@ xVar.head()
       <td>0</td>
       <td>0.000304</td>
       <td>3.905631e-07</td>
-      <td>2030.0</td>
-      <td>519.0</td>
-      <td>1859.0</td>
+      <td>2030</td>
+      <td>519</td>
+      <td>1859</td>
       <td>1</td>
       <td>1</td>
-      <td>1.0</td>
+      <td>1</td>
       <td>0</td>
-      <td>36.0</td>
+      <td>36</td>
       <td>0.000048</td>
-      <td>3.0</td>
+      <td>3</td>
       <td>0.006803</td>
       <td>0.476190</td>
-      <td>6042.0</td>
+      <td>6042</td>
       <td>0.830619</td>
       <td>5.377061e-05</td>
       <td>0</td>
@@ -1108,15 +1074,15 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>96.0</td>
+      <td>96</td>
       <td>1</td>
       <td>1</td>
+      <td>0</td>
+      <td>0</td>
       <td>1645</td>
       <td>3</td>
       <td>0</td>
       <td>1</td>
-      <td>0</td>
-      <td>0</td>
       <td>0</td>
     </tr>
     <tr>
@@ -1127,19 +1093,19 @@ xVar.head()
       <td>0</td>
       <td>0.000243</td>
       <td>1.785776e-07</td>
-      <td>1015.0</td>
-      <td>446.0</td>
-      <td>661.0</td>
+      <td>1015</td>
+      <td>446</td>
+      <td>661</td>
       <td>1</td>
       <td>0</td>
-      <td>0.0</td>
       <td>0</td>
-      <td>6.0</td>
+      <td>0</td>
+      <td>6</td>
       <td>0.000019</td>
-      <td>0.0</td>
+      <td>0</td>
       <td>0.200000</td>
       <td>0.400000</td>
-      <td>531.0</td>
+      <td>531</td>
       <td>0.028252</td>
       <td>2.210768e-06</td>
       <td>0</td>
@@ -1150,13 +1116,13 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>124.0</td>
+      <td>124</td>
+      <td>1</td>
+      <td>0</td>
       <td>1</td>
       <td>0</td>
       <td>1321</td>
       <td>5</td>
-      <td>0</td>
-      <td>1</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
@@ -1169,19 +1135,19 @@ xVar.head()
       <td>0</td>
       <td>0.000061</td>
       <td>8.518251e-14</td>
-      <td>12.0</td>
-      <td>277.0</td>
-      <td>48.0</td>
+      <td>12</td>
+      <td>277</td>
+      <td>48</td>
       <td>1</td>
       <td>0</td>
-      <td>0.0</td>
       <td>0</td>
-      <td>492.0</td>
+      <td>0</td>
+      <td>492</td>
       <td>0.000000</td>
-      <td>0.0</td>
+      <td>0</td>
       <td>0.851852</td>
       <td>1.000000</td>
-      <td>774.0</td>
+      <td>774</td>
       <td>0.152563</td>
       <td>7.589479e-11</td>
       <td>0</td>
@@ -1192,7 +1158,9 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>134.0</td>
+      <td>134</td>
+      <td>1</td>
+      <td>0</td>
       <td>1</td>
       <td>0</td>
       <td>1865</td>
@@ -1200,8 +1168,6 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>1</td>
-      <td>1</td>
-      <td>0</td>
     </tr>
     <tr>
       <th>3</th>
@@ -1211,19 +1177,19 @@ xVar.head()
       <td>0</td>
       <td>0.000668</td>
       <td>4.315565e-05</td>
-      <td>347.0</td>
-      <td>608.0</td>
-      <td>496.0</td>
+      <td>347</td>
+      <td>608</td>
+      <td>496</td>
       <td>1</td>
       <td>0</td>
-      <td>0.0</td>
       <td>0</td>
-      <td>138.0</td>
+      <td>0</td>
+      <td>138</td>
       <td>0.000388</td>
-      <td>0.0</td>
+      <td>0</td>
       <td>0.033898</td>
       <td>0.220339</td>
-      <td>6383.0</td>
+      <td>6383</td>
       <td>0.333378</td>
       <td>3.327919e-04</td>
       <td>0</td>
@@ -1234,12 +1200,12 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>128.0</td>
+      <td>128</td>
+      <td>1</td>
+      <td>0</td>
       <td>1</td>
       <td>0</td>
       <td>2451</td>
-      <td>1</td>
-      <td>0</td>
       <td>1</td>
       <td>0</td>
       <td>1</td>
@@ -1253,19 +1219,19 @@ xVar.head()
       <td>0</td>
       <td>0.000000</td>
       <td>0.000000e+00</td>
-      <td>25.0</td>
-      <td>321.0</td>
-      <td>1687.0</td>
+      <td>25</td>
+      <td>321</td>
+      <td>1687</td>
       <td>1</td>
       <td>0</td>
-      <td>0.0</td>
       <td>0</td>
-      <td>15.0</td>
+      <td>0</td>
+      <td>15</td>
       <td>0.000000</td>
-      <td>0.0</td>
+      <td>0</td>
       <td>0.027855</td>
       <td>0.006685</td>
-      <td>8360.0</td>
+      <td>8360</td>
       <td>10.142596</td>
       <td>0.000000e+00</td>
       <td>0</td>
@@ -1276,15 +1242,15 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>136.0</td>
+      <td>136</td>
       <td>1</td>
+      <td>0</td>
+      <td>0</td>
       <td>0</td>
       <td>3052</td>
       <td>1</td>
       <td>0</td>
       <td>1</td>
-      <td>0</td>
-      <td>0</td>
       <td>0</td>
     </tr>
   </tbody>
@@ -1352,13 +1318,13 @@ results_df.loc[len(results_df)] = ['rfc_baseline'] + list(get_results(clf))
 results_df
 ```
 
-    Accuracy on Training Data: 100.0 %.
-    Accuracy on Test Data: 80.65 %.
-    AUC score:  0.73
+    Accuracy on Training Data: 99.92 %.
+    Accuracy on Test Data: 83.67 %.
+    AUC score:  0.78
     Predicted Result    0   1
     Actual Result            
-    0                 121  15
-    1                  21  29
+    0                 195  18
+    1                  31  56
 
 
 
@@ -1393,12 +1359,12 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.0</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
   </tbody>
 </table>
@@ -1438,20 +1404,24 @@ results_df.loc[len(results_df)] = ['rfc_gs'] + list(get_results(best_clf_rf))
 results_df
 ```
 
+    /home/rosles/projects/crisis-data/venv/lib/python3.6/site-packages/sklearn/model_selection/_split.py:1978: FutureWarning: The default value of cv will change from 3 to 5 in version 0.22. Specify it explicitly to silence this warning.
+      warnings.warn(CV_WARNING, FutureWarning)
+
+
     RandomForestClassifier(bootstrap=True, class_weight='balanced',
-                           criterion='gini', max_depth=10, max_features='log2',
+                           criterion='gini', max_depth=10, max_features='sqrt',
                            max_leaf_nodes=None, min_impurity_decrease=0.0,
                            min_impurity_split=None, min_samples_leaf=1,
                            min_samples_split=2, min_weight_fraction_leaf=0.0,
-                           n_estimators=300, n_jobs=-1, oob_score=False,
+                           n_estimators=600, n_jobs=-1, oob_score=False,
                            random_state=None, verbose=0, warm_start=False)
-    Accuracy on Training Data: 98.92 %.
-    Accuracy on Test Data: 77.96 %.
-    AUC score:  0.69
+    Accuracy on Training Data: 97.16 %.
+    Accuracy on Test Data: 84.33 %.
+    AUC score:  0.79
     Predicted Result    0   1
     Actual Result            
-    0                 120  16
-    1                  25  25
+    0                 196  17
+    1                  30  57
 
 
 
@@ -1486,21 +1456,21 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.00</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>gs_rfc</td>
-      <td>98.92</td>
-      <td>77.96</td>
-      <td>0.69</td>
-      <td>0.61</td>
-      <td>0.50</td>
+      <td>rfc_gs</td>
+      <td>97.16</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.77</td>
+      <td>0.66</td>
     </tr>
   </tbody>
 </table>
@@ -1520,25 +1490,25 @@ feat_importance
 
 
 
-    [('local_profile_location', 0.1),
-     ('favourites_count', 0.05),
-     ('statuses_count', 0.05),
-     ('undirected_eigenvector_centrality', 0.05),
-     ('tweet_from_locality', 0.05),
-     ('description_length', 0.05),
-     ('account_age', 0.05),
+    [('local_profile_location', 0.14),
+     ('tweet_from_locality', 0.06),
+     ('listed_count', 0.05),
+     ('ratio_detected', 0.05),
+     ('is_data_source_3', 0.05),
+     ('favourites_count', 0.04),
      ('followers_count', 0.04),
-     ('friends_count', 0.04),
-     ('listed_count', 0.04),
-     ('ratio_detected', 0.04),
-     ('ratio_original', 0.04),
+     ('statuses_count', 0.04),
      ('tweets_per_hour', 0.04),
-     ('day_of_detection', 0.04),
-     ('is_data_source_3', 0.04),
+     ('undirected_eigenvector_centrality', 0.04),
+     ('local_tw_and_local_profile', 0.04),
+     ('account_age', 0.04),
+     ('is_data_source_1', 0.04),
      ('closeness_centrality', 0.03),
      ('degree_centrality', 0.03),
-     ('local_tw_and_local_profile', 0.03),
-     ('is_data_source_1', 0.03),
+     ('friends_count', 0.03),
+     ('ratio_original', 0.03),
+     ('description_length', 0.03),
+     ('day_of_detection', 0.03),
      ('betweenness_centrality', 0.02),
      ('eigenvector_centrality', 0.02),
      ('load_centrality', 0.02),
@@ -1548,17 +1518,17 @@ feat_importance
      ('geo_enabled', 0.01),
      ('has_extended_profile', 0.01),
      ('in_degree', 0.01),
-     ('local_timezone', 0.01),
-     ('three_local_metrics', 0.01),
      ('local_tw_and_local_tz', 0.01),
      ('has_url', 0.01),
      ('default_profile_image', 0.0),
      ('is_translation_enabled', 0.0),
      ('verified', 0.0),
+     ('local_timezone', 0.0),
+     ('three_local_metrics', 0.0),
      ('lang_is_en', 0.0),
      ('has_translator_type', 0.0),
-     ('is_user_class_2', 0.0),
-     ('changed_screen_name', 0.0)]
+     ('changed_screen_name', 0.0),
+     ('is_user_class_2', 0.0)]
 
 
 
@@ -1607,20 +1577,20 @@ X_test = X_test_unpruned
 results_df
 ```
 
-    Accuracy on Training Data: 99.33 %.
-    Accuracy on Test Data: 80.11 %.
-    AUC score:  0.71
+    Accuracy on Training Data: 97.66 %.
+    Accuracy on Test Data: 84.33 %.
+    AUC score:  0.79
     Predicted Result    0   1
     Actual Result            
-    0                 123  13
-    1                  24  26
-    Accuracy on Training Data: 99.6 %.
-    Accuracy on Test Data: 80.65 %.
-    AUC score:  0.73
+    0                 195  18
+    1                  29  58
+    Accuracy on Training Data: 97.58 %.
+    Accuracy on Test Data: 82.0 %.
+    AUC score:  0.75
     Predicted Result    0   1
     Actual Result            
-    0                 122  14
-    1                  22  28
+    0                 195  18
+    1                  36  51
 
 
 
@@ -1655,39 +1625,39 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.00</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>gs_rfc</td>
-      <td>98.92</td>
-      <td>77.96</td>
-      <td>0.69</td>
-      <td>0.61</td>
-      <td>0.50</td>
+      <td>rfc_gs</td>
+      <td>97.16</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.77</td>
+      <td>0.66</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>pruned_0.01_rfc</td>
-      <td>99.33</td>
-      <td>80.11</td>
-      <td>0.71</td>
+      <td>rfc_pruned_0.01</td>
+      <td>97.66</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.76</td>
       <td>0.67</td>
-      <td>0.52</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>pruned_0.02_rfc</td>
-      <td>99.60</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.67</td>
-      <td>0.56</td>
+      <td>rfc_pruned_0.02</td>
+      <td>97.58</td>
+      <td>82.00</td>
+      <td>0.75</td>
+      <td>0.74</td>
+      <td>0.59</td>
     </tr>
   </tbody>
 </table>
@@ -1712,13 +1682,13 @@ clf.fit(X_train, y_train)
 results_df.loc[len(results_df)] = ['xgb_baseline'] + list(get_results(clf))
 ```
 
-    Accuracy on Training Data: 100.0 %.
-    Accuracy on Test Data: 81.18 %.
+    Accuracy on Training Data: 99.83 %.
+    Accuracy on Test Data: 82.0 %.
     AUC score:  0.74
     Predicted Result    0   1
     Actual Result            
-    0                 121  15
-    1                  20  30
+    0                 197  16
+    1                  38  49
 
 
 
@@ -1734,13 +1704,13 @@ results_df.loc[len(results_df)] = ['xgb_weighted'] + list(get_results(clf))
 results_df
 ```
 
-    Accuracy on Training Data: 98.52 %.
-    Accuracy on Test Data: 81.18 %.
+    Accuracy on Training Data: 95.75 %.
+    Accuracy on Test Data: 82.33 %.
     AUC score:  0.8
     Predicted Result    0   1
     Actual Result            
-    0                 113  23
-    1                  12  38
+    0                 181  32
+    1                  21  66
 
 
 
@@ -1775,56 +1745,56 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.00</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>gs_rfc</td>
-      <td>98.92</td>
-      <td>77.96</td>
-      <td>0.69</td>
-      <td>0.61</td>
-      <td>0.50</td>
+      <td>rfc_gs</td>
+      <td>97.16</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.77</td>
+      <td>0.66</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>pruned_0.01_rfc</td>
-      <td>99.33</td>
-      <td>80.11</td>
-      <td>0.71</td>
+      <td>rfc_pruned_0.01</td>
+      <td>97.66</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.76</td>
       <td>0.67</td>
-      <td>0.52</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>pruned_0.02_rfc</td>
-      <td>99.60</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.67</td>
-      <td>0.56</td>
+      <td>rfc_pruned_0.02</td>
+      <td>97.58</td>
+      <td>82.00</td>
+      <td>0.75</td>
+      <td>0.74</td>
+      <td>0.59</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>baseline_xgb</td>
-      <td>100.00</td>
-      <td>81.18</td>
+      <td>xgb_baseline</td>
+      <td>99.83</td>
+      <td>82.00</td>
       <td>0.74</td>
-      <td>0.67</td>
-      <td>0.60</td>
+      <td>0.75</td>
+      <td>0.56</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>weighted_xgb</td>
-      <td>98.52</td>
-      <td>81.18</td>
+      <td>xgb_weighted</td>
+      <td>95.75</td>
+      <td>82.33</td>
       <td>0.80</td>
-      <td>0.62</td>
+      <td>0.67</td>
       <td>0.76</td>
     </tr>
   </tbody>
@@ -1869,16 +1839,16 @@ print(best_clf_xgb)
 results_df
 ```
 
-    Accuracy on Training Data: 91.39 %.
-    Accuracy on Test Data: 79.57 %.
-    AUC score:  0.8
+    Accuracy on Training Data: 90.24 %.
+    Accuracy on Test Data: 81.67 %.
+    AUC score:  0.82
     Predicted Result    0   1
     Actual Result            
-    0                 108  28
-    1                  10  40
+    0                 172  41
+    1                  14  73
     XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
                   colsample_bynode=1, colsample_bytree=1, eval_metric='auc',
-                  gamma=1, learning_rate=0.1, max_delta_step=0, max_depth=8,
+                  gamma=1, learning_rate=0.05, max_delta_step=0, max_depth=8,
                   min_child_weight=5, missing=None, n_estimators=200, n_jobs=-1,
                   nthread=None, objective='binary:logistic', random_state=0,
                   reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=None,
@@ -1917,66 +1887,66 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.00</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>gs_rfc</td>
-      <td>98.92</td>
-      <td>77.96</td>
-      <td>0.69</td>
-      <td>0.61</td>
-      <td>0.50</td>
+      <td>rfc_gs</td>
+      <td>97.16</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.77</td>
+      <td>0.66</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>pruned_0.01_rfc</td>
-      <td>99.33</td>
-      <td>80.11</td>
-      <td>0.71</td>
+      <td>rfc_pruned_0.01</td>
+      <td>97.66</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.76</td>
       <td>0.67</td>
-      <td>0.52</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>pruned_0.02_rfc</td>
-      <td>99.60</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.67</td>
-      <td>0.56</td>
+      <td>rfc_pruned_0.02</td>
+      <td>97.58</td>
+      <td>82.00</td>
+      <td>0.75</td>
+      <td>0.74</td>
+      <td>0.59</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>baseline_xgb</td>
-      <td>100.00</td>
-      <td>81.18</td>
+      <td>xgb_baseline</td>
+      <td>99.83</td>
+      <td>82.00</td>
       <td>0.74</td>
-      <td>0.67</td>
-      <td>0.60</td>
+      <td>0.75</td>
+      <td>0.56</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>weighted_xgb</td>
-      <td>98.52</td>
-      <td>81.18</td>
+      <td>xgb_weighted</td>
+      <td>95.75</td>
+      <td>82.33</td>
       <td>0.80</td>
-      <td>0.62</td>
+      <td>0.67</td>
       <td>0.76</td>
     </tr>
     <tr>
       <th>6</th>
-      <td>gs_weighted_xgb</td>
-      <td>91.39</td>
-      <td>79.57</td>
-      <td>0.80</td>
-      <td>0.59</td>
-      <td>0.80</td>
+      <td>xgb_weighted_gs</td>
+      <td>90.24</td>
+      <td>81.67</td>
+      <td>0.82</td>
+      <td>0.64</td>
+      <td>0.84</td>
     </tr>
   </tbody>
 </table>
@@ -1993,45 +1963,45 @@ feat_importance
 
 
 
-    [('local_profile_location', 0.2),
+    [('local_profile_location', 0.25),
      ('tweet_from_locality', 0.13),
+     ('listed_count', 0.05),
      ('betweenness_centrality', 0.04),
-     ('listed_count', 0.04),
-     ('ratio_original', 0.04),
-     ('undirected_eigenvector_centrality', 0.04),
-     ('day_of_detection', 0.04),
-     ('has_url', 0.04),
      ('default_profile', 0.03),
      ('degree_centrality', 0.03),
-     ('favourites_count', 0.03),
-     ('followers_count', 0.03),
-     ('has_extended_profile', 0.03),
-     ('ratio_detected', 0.03),
-     ('statuses_count', 0.03),
-     ('tweets_per_hour', 0.03),
-     ('description_length', 0.03),
-     ('account_age', 0.03),
+     ('load_centrality', 0.03),
+     ('undirected_eigenvector_centrality', 0.03),
+     ('day_of_detection', 0.03),
      ('closeness_centrality', 0.02),
      ('eigenvector_centrality', 0.02),
+     ('favourites_count', 0.02),
+     ('followers_count', 0.02),
      ('friends_count', 0.02),
      ('geo_enabled', 0.02),
-     ('in_degree', 0.02),
-     ('out_degree', 0.02),
+     ('ratio_detected', 0.02),
+     ('ratio_original', 0.02),
+     ('statuses_count', 0.02),
+     ('tweets_per_hour', 0.02),
      ('local_timezone', 0.02),
+     ('local_tw_and_local_tz', 0.02),
+     ('description_length', 0.02),
+     ('has_url', 0.02),
+     ('account_age', 0.02),
+     ('has_extended_profile', 0.01),
+     ('in_degree', 0.01),
+     ('out_degree', 0.01),
+     ('local_tw_and_local_profile', 0.01),
      ('default_profile_image', 0.0),
      ('is_translation_enabled', 0.0),
-     ('load_centrality', 0.0),
      ('verified', 0.0),
      ('three_local_metrics', 0.0),
-     ('local_tw_and_local_profile', 0.0),
-     ('local_tw_and_local_tz', 0.0),
      ('local_tz_and_local_profile', 0.0),
      ('lang_is_en', 0.0),
      ('has_translator_type', 0.0),
+     ('changed_screen_name', 0.0),
      ('is_user_class_2', 0.0),
      ('is_data_source_1', 0.0),
-     ('is_data_source_3', 0.0),
-     ('changed_screen_name', 0.0)]
+     ('is_data_source_3', 0.0)]
 
 
 
@@ -2077,20 +2047,20 @@ X_test = X_test_unpruned
 results_df
 ```
 
-    Accuracy on Training Data: 99.6 %.
-    Accuracy on Test Data: 79.03 %.
-    AUC score:  0.72
+    Accuracy on Training Data: 96.0 %.
+    Accuracy on Test Data: 84.67 %.
+    AUC score:  0.8
     Predicted Result    0   1
     Actual Result            
-    0                 119  17
-    1                  22  28
-    Accuracy on Training Data: 98.52 %.
-    Accuracy on Test Data: 79.57 %.
+    0                 195  18
+    1                  28  59
+    Accuracy on Training Data: 97.91 %.
+    Accuracy on Test Data: 81.33 %.
     AUC score:  0.73
     Predicted Result    0   1
     Actual Result            
-    0                 118  18
-    1                  20  30
+    0                 197  16
+    1                  40  47
 
 
 
@@ -2125,84 +2095,84 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>baseline_rfc</td>
-      <td>100.00</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.66</td>
-      <td>0.58</td>
+      <td>rfc_baseline</td>
+      <td>99.92</td>
+      <td>83.67</td>
+      <td>0.78</td>
+      <td>0.76</td>
+      <td>0.64</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>gs_rfc</td>
-      <td>98.92</td>
-      <td>77.96</td>
-      <td>0.69</td>
-      <td>0.61</td>
-      <td>0.50</td>
+      <td>rfc_gs</td>
+      <td>97.16</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.77</td>
+      <td>0.66</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>pruned_0.01_rfc</td>
-      <td>99.33</td>
-      <td>80.11</td>
-      <td>0.71</td>
+      <td>rfc_pruned_0.01</td>
+      <td>97.66</td>
+      <td>84.33</td>
+      <td>0.79</td>
+      <td>0.76</td>
       <td>0.67</td>
-      <td>0.52</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>pruned_0.02_rfc</td>
-      <td>99.60</td>
-      <td>80.65</td>
-      <td>0.73</td>
-      <td>0.67</td>
-      <td>0.56</td>
+      <td>rfc_pruned_0.02</td>
+      <td>97.58</td>
+      <td>82.00</td>
+      <td>0.75</td>
+      <td>0.74</td>
+      <td>0.59</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>baseline_xgb</td>
-      <td>100.00</td>
-      <td>81.18</td>
+      <td>xgb_baseline</td>
+      <td>99.83</td>
+      <td>82.00</td>
       <td>0.74</td>
-      <td>0.67</td>
-      <td>0.60</td>
+      <td>0.75</td>
+      <td>0.56</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>weighted_xgb</td>
-      <td>98.52</td>
-      <td>81.18</td>
+      <td>xgb_weighted</td>
+      <td>95.75</td>
+      <td>82.33</td>
       <td>0.80</td>
-      <td>0.62</td>
+      <td>0.67</td>
       <td>0.76</td>
     </tr>
     <tr>
       <th>6</th>
-      <td>gs_weighted_xgb</td>
-      <td>91.39</td>
-      <td>79.57</td>
-      <td>0.80</td>
-      <td>0.59</td>
-      <td>0.80</td>
+      <td>xgb_weighted_gs</td>
+      <td>90.24</td>
+      <td>81.67</td>
+      <td>0.82</td>
+      <td>0.64</td>
+      <td>0.84</td>
     </tr>
     <tr>
       <th>7</th>
-      <td>no_network_rfc</td>
-      <td>99.60</td>
-      <td>79.03</td>
-      <td>0.72</td>
-      <td>0.62</td>
-      <td>0.56</td>
+      <td>rfc_no_network</td>
+      <td>96.00</td>
+      <td>84.67</td>
+      <td>0.80</td>
+      <td>0.77</td>
+      <td>0.68</td>
     </tr>
     <tr>
       <th>8</th>
-      <td>no_network_xgb</td>
-      <td>98.52</td>
-      <td>79.57</td>
+      <td>xgb_no_network</td>
+      <td>97.91</td>
+      <td>81.33</td>
       <td>0.73</td>
-      <td>0.62</td>
-      <td>0.60</td>
+      <td>0.75</td>
+      <td>0.54</td>
     </tr>
   </tbody>
 </table>
@@ -2230,10 +2200,9 @@ xVar.columns
            'local_profile_location', 'local_timezone', 'tweet_from_locality',
            'three_local_metrics', 'local_tw_and_local_profile',
            'local_tw_and_local_tz', 'local_tz_and_local_profile',
-           'description_length', 'lang_is_en', 'has_translator_type',
-           'account_age', 'day_of_detection', 'is_user_class_2',
-           'is_data_source_1', 'is_data_source_3', 'has_url',
-           'changed_screen_name'],
+           'description_length', 'lang_is_en', 'has_translator_type', 'has_url',
+           'changed_screen_name', 'account_age', 'day_of_detection',
+           'is_user_class_2', 'is_data_source_1', 'is_data_source_3'],
           dtype='object')
 
 
