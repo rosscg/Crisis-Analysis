@@ -909,16 +909,71 @@ print(users_df.shape)
     (1499, 50)
 
 
-## Classification
-
-The data is now ready for classification. Random forests will be used initially and will suit the relatively small dataset. These will be compared to XGBoost models.
+## Data Verification and Splitting
 
 
 ```python
-import pandas as pd
-import numpy as np
-from sklearn.model_selection import train_test_split
+%matplotlib inline
 
+cols_to_drop = ['id', 'user_id']
+
+# Ignore binary columns:
+for col in users_df.columns:
+    if len(users_df[col].value_counts()) == 2:
+        cols_to_drop += [col]
+
+users_df.drop(cols_to_drop, axis=1).hist(bins=50, figsize=(20,15));
+
+```
+
+
+![png](harvey_user_location_files/harvey_user_location_36_0.png)
+
+
+##### Notes: 
+* account_age has many low values, which may be an error in the age calculation or may simply suggest input from newly created accounts. This could be due to users creating accounts specifically to talk about the event, or bot traffic where bots are likely to be detected and removed over time so they are not represented at larger age values. Need to investigate further.
+* account_age has a spike of accounts created around 3000 days prior to the event. This could also be an error in data collection, or could represent a significant event in Twitter's history.
+* day_of_detection represents the earliest day an account is detected, so even where behaviour is constant, we expect to see a decrease in these values as accounts are detected a second time. There is a large amount of accounts detected at day=1, which could be an error in the collection or calculation. To be checked.
+* ratio_detected has spikes at expected increments: 1, 1/2, 1/3, 1/4 - these are more common as low Tweet count is more common.
+
+
+```python
+# Look closer at account_age:
+users_df['account_age'].hist(bins=100);
+```
+
+
+![png](harvey_user_location_files/harvey_user_location_38_0.png)
+
+
+The spike at age=3000 appears natural, so is less likely to be a calculation/collection error. Now we can look at the most recent account ages in more detail:
+
+
+```python
+# Histogram of accounts made in the last 6 months:
+users_df['account_age'].loc[users_df['account_age'] < 180].hist(bins=90);
+```
+
+
+![png](harvey_user_location_files/harvey_user_location_40_0.png)
+
+
+There is a clear spike in accounts made up to 20 days prior to the end of the data collection. This may be consistent with regular Twitter usage as bots are recreated, or users may make accounts to participate in the hurricane discussion. This could be compared to a random Twitter stream in future work.
+
+In any case, it does not appear to be a collection error.
+
+Note: the date from which this age was calculated was approximately 7 days after the hurricane made landfall.
+
+
+```python
+# Stratification to ensure proportional representation of class in test set:
+# Set category:
+# users_df['strat'] = pd.cut(users_df['to_strat'], bins=[0,1.5,2.5, np.inf], labels=[1,2,3])
+# Then split with StratifiedShuffleSplit
+```
+
+
+```python
 # Display all columns of DF in cell:
 pd.set_option('display.max_columns', None)
 
@@ -959,6 +1014,8 @@ The dataframe is also checked for any columns that were not cleaned appropriatel
 
 
 ```python
+from sklearn.model_selection import train_test_split
+
 # Excluded features:
 dropped_cols = ['added_at', 'description', 'created_at', 'id',  'location', 'name', 'url', 
                 'screen_name', 'user_id', 'coded_as_witness', 'old_screen_name']
@@ -969,11 +1026,11 @@ yVar = users_df['coded_as_witness']
 
 # Partition data sets:
 xVar = xVar.fillna(0)
-X_train, X_test, y_train, y_test = train_test_split(xVar, yVar, test_size=0.2)
+X_train, X_test, y_train, y_test = train_test_split(xVar, yVar, test_size=0.2, random_state=42)
 print (X_train.shape, y_train.shape)
 print (X_test.shape, y_test.shape)
 
-xVar.head()
+X_train.head()
 ```
 
     (1199, 39) (1199,)
@@ -1044,28 +1101,28 @@ xVar.head()
   </thead>
   <tbody>
     <tr>
-      <th>0</th>
-      <td>0.000043</td>
-      <td>0.135798</td>
+      <th>383</th>
+      <td>0.000705</td>
+      <td>0.187359</td>
       <td>0</td>
       <td>0</td>
-      <td>0.000304</td>
-      <td>3.905631e-07</td>
-      <td>2030</td>
-      <td>519</td>
-      <td>1859</td>
-      <td>1</td>
-      <td>1</td>
+      <td>0.001397</td>
+      <td>2.397852e-04</td>
+      <td>708</td>
+      <td>3039</td>
+      <td>1011</td>
       <td>1</td>
       <td>0</td>
-      <td>36</td>
-      <td>0.000048</td>
+      <td>10</td>
+      <td>0</td>
+      <td>107</td>
+      <td>0.000725</td>
       <td>3</td>
-      <td>0.006803</td>
-      <td>0.476190</td>
-      <td>6042</td>
-      <td>0.830619</td>
-      <td>5.377061e-05</td>
+      <td>0.076923</td>
+      <td>0.769231</td>
+      <td>6086</td>
+      <td>0.073456</td>
+      <td>0.000708</td>
       <td>0</td>
       <td>0</td>
       <td>1</td>
@@ -1074,181 +1131,181 @@ xVar.head()
       <td>0</td>
       <td>0</td>
       <td>0</td>
-      <td>96</td>
-      <td>1</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1645</td>
-      <td>3</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>0.000015</td>
-      <td>0.122066</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0.000243</td>
-      <td>1.785776e-07</td>
-      <td>1015</td>
-      <td>446</td>
-      <td>661</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>6</td>
-      <td>0.000019</td>
-      <td>0</td>
-      <td>0.200000</td>
-      <td>0.400000</td>
-      <td>531</td>
-      <td>0.028252</td>
-      <td>2.210768e-06</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>124</td>
+      <td>148</td>
       <td>1</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
-      <td>1321</td>
+      <td>3158</td>
       <td>5</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
     </tr>
     <tr>
-      <th>2</th>
+      <th>539</th>
       <td>0.000000</td>
-      <td>0.077120</td>
+      <td>0.000000</td>
       <td>0</td>
+      <td>0</td>
+      <td>0.000000</td>
+      <td>0.000000e+00</td>
+      <td>1188</td>
+      <td>115</td>
+      <td>299</td>
+      <td>1</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>9</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>0.040000</td>
+      <td>0.600000</td>
+      <td>2688</td>
+      <td>0.141262</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>58</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>828</td>
+      <td>5</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>1493</th>
+      <td>0.000000</td>
+      <td>0.000000</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.000000</td>
+      <td>0.000000e+00</td>
+      <td>56</td>
+      <td>42</td>
+      <td>361</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>0.032258</td>
+      <td>0.870968</td>
+      <td>840</td>
+      <td>0.175165</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>104</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>408</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>1113</th>
+      <td>0.000000</td>
+      <td>0.000000</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.000000</td>
+      <td>0.000000e+00</td>
+      <td>7</td>
+      <td>50</td>
+      <td>5</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>11</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>0.005319</td>
+      <td>0.867021</td>
+      <td>5382</td>
+      <td>1.062289</td>
+      <td>0.000000</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>68</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>780</td>
+      <td>2</td>
+      <td>0</td>
+      <td>1</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>325</th>
+      <td>0.000000</td>
+      <td>0.000000</td>
+      <td>1</td>
       <td>0</td>
       <td>0.000061</td>
-      <td>8.518251e-14</td>
-      <td>12</td>
-      <td>277</td>
-      <td>48</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>492</td>
-      <td>0.000000</td>
-      <td>0</td>
-      <td>0.851852</td>
-      <td>1.000000</td>
-      <td>774</td>
-      <td>0.152563</td>
-      <td>7.589479e-11</td>
-      <td>0</td>
-      <td>0</td>
+      <td>1.764451e-52</td>
+      <td>39</td>
+      <td>7</td>
+      <td>57</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>134</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1865</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>0.000383</td>
-      <td>0.167070</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0.000668</td>
-      <td>4.315565e-05</td>
-      <td>347</td>
-      <td>608</td>
-      <td>496</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>138</td>
-      <td>0.000388</td>
-      <td>0</td>
-      <td>0.033898</td>
-      <td>0.220339</td>
-      <td>6383</td>
-      <td>0.333378</td>
-      <td>3.327919e-04</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>128</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>2451</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>0.000000</td>
-      <td>0.000000</td>
       <td>0</td>
       <td>0</td>
       <td>0.000000</td>
-      <td>0.000000e+00</td>
-      <td>25</td>
-      <td>321</td>
-      <td>1687</td>
+      <td>1</td>
+      <td>0.071429</td>
+      <td>0.857143</td>
+      <td>75</td>
+      <td>0.079107</td>
+      <td>0.000239</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>127</td>
       <td>1</td>
       <td>0</td>
       <td>0</td>
-      <td>0</td>
-      <td>15</td>
-      <td>0.000000</td>
-      <td>0</td>
-      <td>0.027855</td>
-      <td>0.006685</td>
-      <td>8360</td>
-      <td>10.142596</td>
-      <td>0.000000e+00</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>136</td>
       <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>3052</td>
-      <td>1</td>
+      <td>17</td>
+      <td>5</td>
       <td>0</td>
       <td>1</td>
       <td>0</td>
@@ -1258,6 +1315,88 @@ xVar.head()
 </div>
 
 
+
+## Data Exploration
+Check for linear correlations:
+
+
+```python
+# Create copy of training data to investigate
+df = X_train.copy()
+df['coded_as_witness'] = y_train
+
+corr_matrix = df.corr()
+corr_matrix['coded_as_witness'].sort_values(ascending=False)
+```
+
+
+
+
+    coded_as_witness                     1.000000
+    local_profile_location               0.551050
+    local_tw_and_local_profile           0.437055
+    tweet_from_locality                  0.424988
+    is_data_source_3                     0.424988
+    local_tz_and_local_profile           0.296873
+    local_tw_and_local_tz                0.268485
+    ratio_detected                       0.259706
+    three_local_metrics                  0.253538
+    geo_enabled                          0.249082
+    closeness_centrality                 0.170760
+    ratio_original                       0.138819
+    local_timezone                       0.138634
+    lang_is_en                           0.132348
+    has_extended_profile                 0.116959
+    betweenness_centrality               0.115513
+    load_centrality                      0.115172
+    degree_centrality                    0.114462
+    account_age                          0.093229
+    undirected_eigenvector_centrality    0.041267
+    changed_screen_name                  0.033872
+    in_degree                            0.029015
+    favourites_count                     0.019936
+    friends_count                        0.003855
+    out_degree                           0.003253
+    eigenvector_centrality               0.001058
+    is_translation_enabled              -0.005134
+    verified                            -0.014884
+    has_url                             -0.019378
+    default_profile                     -0.021911
+    has_translator_type                 -0.023297
+    followers_count                     -0.037975
+    default_profile_image               -0.049895
+    statuses_count                      -0.050996
+    is_user_class_2                     -0.076615
+    description_length                  -0.079136
+    tweets_per_hour                     -0.081751
+    listed_count                        -0.092858
+    day_of_detection                    -0.166594
+    is_data_source_1                    -0.396794
+    Name: coded_as_witness, dtype: float64
+
+
+
+We can use scatterplot visualisations to detect correlations.
+
+
+```python
+import matplotlib.pyplot as plt
+
+column_list = [x for x in df.columns if len(df[x].value_counts()) != 2]
+
+fig, axes = plt.subplots(len(column_list), figsize=(6.4,4.8*len(column_list)))
+for idx, col in enumerate(column_list):
+    axes[idx].scatter(df[col], df['coded_as_witness'], alpha=0.1)
+    axes[idx].title.set_text(col)
+```
+
+
+![png](harvey_user_location_files/harvey_user_location_49_0.png)
+
+
+## Classification
+
+The data is now ready for classification. Random forests will be used initially and will suit the relatively small dataset. These will be compared to XGBoost models.
 
 A baseline RandomForest classifier is created for comparison to parameter-tuned models.
 
