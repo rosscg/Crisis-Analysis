@@ -1384,7 +1384,7 @@ import matplotlib.pyplot as plt
 
 column_list = [x for x in df.columns if len(df[x].value_counts()) != 2]
 
-fig, axes = plt.subplots(len(column_list), figsize=(6.4,4.8*len(column_list)))
+fig, axes = plt.subplots(len(column_list), figsize=( 6.4, 4.8*len(column_list) ))
 for idx, col in enumerate(column_list):
     axes[idx].scatter(df[col], df['coded_as_witness'], alpha=0.1)
     axes[idx].title.set_text(col)
@@ -1397,6 +1397,8 @@ for idx, col in enumerate(column_list):
 ## Classification
 
 The data is now ready for classification. Random forests will be used initially and will suit the relatively small dataset. These will be compared to XGBoost models.
+
+TODO: Create logreg baseline clf using only local profile / local tw variables
 
 A baseline RandomForest classifier is created for comparison to parameter-tuned models.
 
