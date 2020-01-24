@@ -1400,6 +1400,69 @@ The data is now ready for classification. Random forests will be used initially 
 
 TODO: Create logreg baseline clf using only local profile / local tw variables
 
+
+```python
+from sklearn.linear_model import LogisticRegression
+X_train_single = X_train.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+X_test_single = X_test.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+clf = LogisticRegression(random_state=0).fit(X_train_single, y_train)
+#clf.score(X_train_single, y_train)
+
+pred_train = clf.predict(X_train_single)
+errors_train = sum(abs(pred_train - y_train))
+train_acc = round((1 - errors_train/len(pred_train)) * 100, 2)
+print('Accuracy on Training Data:', train_acc, '%.')
+# Evaluate Test Data
+pred = clf.predict(X_test_single)
+errors = sum(abs(pred - y_test))
+test_acc = round((1 - errors/len(pred)) * 100, 2)
+print('Accuracy on Test Data:', test_acc, '%.')
+# Evaluate AUC Score
+auc_score = round(roc_auc_score(y_test, pred), 2)
+print('AUC score: ', auc_score)
+# Confusion Matrix:
+print(pd.crosstab(y_test, pred, rownames=['Actual Result'], colnames=['Predicted Result']))
+# Evaluate Precision & Recall:
+prec = round(precision_score(y_test, pred), 2)
+recall = round(recall_score(y_test, pred), 2)
+print(train_acc, test_acc, auc_score, prec, recall)
+```
+
+    Accuracy on Training Data: 83.15 %.
+    Accuracy on Test Data: 78.0 %.
+    AUC score:  0.74
+    Predicted Result    0   1
+    Actual Result            
+    0                 182  38
+    1                  28  52
+    83.15 78.0 0.74 0.58 0.65
+
+
+
+```python
+from sklearn.linear_model import LogisticRegression
+#.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+#clf.score(X_train, y_train)
+get_results(clf)
+```
+
+    Accuracy on Training Data: 83.9 %.
+    Accuracy on Test Data: 78.33 %.
+    AUC score:  0.73
+    Predicted Result    0   1
+    Actual Result            
+    0                 187  33
+    1                  32  48
+
+
+
+
+
+    (83.9, 78.33, 0.73, 0.59, 0.6)
+
+
+
 A baseline RandomForest classifier is created for comparison to parameter-tuned models.
 
 
@@ -1410,16 +1473,19 @@ clf = RandomForestClassifier(n_jobs=-1, random_state=0, n_estimators=100)
 clf.fit(X_train, y_train)
 ```
 
+    Accuracy on Training Data: 100.0 %.
+    Accuracy on Test Data: 81.67 %.
+    AUC score:  0.77
+    Predicted Result    0   1
+    Actual Result            
+    0                 192  28
+    1                  27  53
 
 
 
-    RandomForestClassifier(bootstrap=True, class_weight=None, criterion='gini',
-                           max_depth=None, max_features='auto', max_leaf_nodes=None,
-                           min_impurity_decrease=0.0, min_impurity_split=None,
-                           min_samples_leaf=1, min_samples_split=2,
-                           min_weight_fraction_leaf=0.0, n_estimators=100,
-                           n_jobs=-1, oob_score=False, random_state=0, verbose=0,
-                           warm_start=False)
+
+
+    (100.0, 81.67, 0.77, 0.65, 0.66)
 
 
 
@@ -1427,7 +1493,7 @@ clf.fit(X_train, y_train)
 ```python
 from sklearn.metrics import precision_score, recall_score
 
-def get_results(clf):
+def get_results(clf, X_train = X_train):
     # Evaluate Training Data
     pred_train = clf.predict(X_train)
     errors_train = sum(abs(pred_train - y_train))
