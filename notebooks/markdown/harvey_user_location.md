@@ -1398,102 +1398,11 @@ for idx, col in enumerate(column_list):
 
 The data is now ready for classification. Random forests will be used initially and will suit the relatively small dataset. These will be compared to XGBoost models.
 
-TODO: Create logreg baseline clf using only local profile / local tw variables
-
-
-```python
-from sklearn.linear_model import LogisticRegression
-X_train_single = X_train.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
-X_test_single = X_test.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
-clf = LogisticRegression(random_state=0).fit(X_train_single, y_train)
-#clf.score(X_train_single, y_train)
-
-pred_train = clf.predict(X_train_single)
-errors_train = sum(abs(pred_train - y_train))
-train_acc = round((1 - errors_train/len(pred_train)) * 100, 2)
-print('Accuracy on Training Data:', train_acc, '%.')
-# Evaluate Test Data
-pred = clf.predict(X_test_single)
-errors = sum(abs(pred - y_test))
-test_acc = round((1 - errors/len(pred)) * 100, 2)
-print('Accuracy on Test Data:', test_acc, '%.')
-# Evaluate AUC Score
-auc_score = round(roc_auc_score(y_test, pred), 2)
-print('AUC score: ', auc_score)
-# Confusion Matrix:
-print(pd.crosstab(y_test, pred, rownames=['Actual Result'], colnames=['Predicted Result']))
-# Evaluate Precision & Recall:
-prec = round(precision_score(y_test, pred), 2)
-recall = round(recall_score(y_test, pred), 2)
-print(train_acc, test_acc, auc_score, prec, recall)
-```
-
-    Accuracy on Training Data: 83.15 %.
-    Accuracy on Test Data: 78.0 %.
-    AUC score:  0.74
-    Predicted Result    0   1
-    Actual Result            
-    0                 182  38
-    1                  28  52
-    83.15 78.0 0.74 0.58 0.65
-
-
-
-```python
-from sklearn.linear_model import LogisticRegression
-#.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
-clf = LogisticRegression(random_state=0).fit(X_train, y_train)
-#clf.score(X_train, y_train)
-get_results(clf)
-```
-
-    Accuracy on Training Data: 83.9 %.
-    Accuracy on Test Data: 78.33 %.
-    AUC score:  0.73
-    Predicted Result    0   1
-    Actual Result            
-    0                 187  33
-    1                  32  48
-
-
-
-
-
-    (83.9, 78.33, 0.73, 0.59, 0.6)
-
-
-
-A baseline RandomForest classifier is created for comparison to parameter-tuned models.
-
-
-```python
-from sklearn.ensemble import RandomForestClassifier
-
-clf = RandomForestClassifier(n_jobs=-1, random_state=0, n_estimators=100)
-clf.fit(X_train, y_train)
-```
-
-    Accuracy on Training Data: 100.0 %.
-    Accuracy on Test Data: 81.67 %.
-    AUC score:  0.77
-    Predicted Result    0   1
-    Actual Result            
-    0                 192  28
-    1                  27  53
-
-
-
-
-
-    (100.0, 81.67, 0.77, 0.65, 0.66)
-
-
-
 
 ```python
 from sklearn.metrics import precision_score, recall_score
 
-def get_results(clf, X_train = X_train):
+def get_results(clf, X_train, y_train, X_test, y_test):
     # Evaluate Training Data
     pred_train = clf.predict(X_train)
     errors_train = sum(abs(pred_train - y_train))
@@ -1517,22 +1426,77 @@ def get_results(clf, X_train = X_train):
 
 
 ```python
-from sklearn.metrics import roc_auc_score
+#from sklearn.metrics import roc_auc_score
 
 results_df = pd.DataFrame(columns=['model', 'train_acc', 'test_acc', 'auc', 'precision', 'recall'])
-results_df.loc[len(results_df)] = ['rfc_baseline'] + list(get_results(clf))
-
-results_df
 ```
 
-    Accuracy on Training Data: 99.92 %.
-    Accuracy on Test Data: 83.67 %.
-    AUC score:  0.78
+### Logistic Regression
+Logistic Regression using single variable:
+
+
+```python
+from sklearn.linear_model import LogisticRegression
+X_train_single = X_train.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+X_test_single = X_test.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+clf = LogisticRegression(random_state=0).fit(X_train_single, y_train)
+#clf.score(X_train_single, y_train)
+
+results_df.loc[len(results_df)] = ['logr_localprofile'] + list(get_results(clf, X_train_single, y_train, X_test_single, y_test))
+```
+
+    Accuracy on Training Data: 83.15 %.
+    Accuracy on Test Data: 78.0 %.
+    AUC score:  0.74
     Predicted Result    0   1
     Actual Result            
-    0                 195  18
-    1                  31  56
+    0                 182  38
+    1                  28  52
 
+
+
+```python
+X_train_single = X_train.drop([x for x in X_train.columns if x != 'tweet_from_locality'], axis=1)
+X_test_single = X_test.drop([x for x in X_train.columns if x != 'tweet_from_locality'], axis=1)
+clf = LogisticRegression(random_state=0).fit(X_train_single, y_train)
+#clf.score(X_train_single, y_train)
+
+results_df.loc[len(results_df)] = ['logr_localtweet'] + list(get_results(clf, X_train_single, y_train, X_test_single, y_test))
+```
+
+    Accuracy on Training Data: 76.9 %.
+    Accuracy on Test Data: 76.67 %.
+    AUC score:  0.75
+    Predicted Result    0   1
+    Actual Result            
+    0                 174  46
+    1                  24  56
+
+
+Logistic Regression using all variables
+
+
+```python
+from sklearn.linear_model import LogisticRegression
+#.drop([x for x in X_train.columns if x != 'local_profile_location'], axis=1)
+clf = LogisticRegression(random_state=0).fit(X_train, y_train)
+#clf.score(X_train, y_train)
+results_df.loc[len(results_df)] = ['logr'] + list(get_results(clf, X_train, y_train, X_test, y_test))
+```
+
+    Accuracy on Training Data: 83.9 %.
+    Accuracy on Test Data: 78.33 %.
+    AUC score:  0.73
+    Predicted Result    0   1
+    Actual Result            
+    0                 187  33
+    1                  32  48
+
+
+
+```python
+results_df
+```
 
 
 
@@ -1566,17 +1530,56 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
+      <td>logr_localprofile</td>
+      <td>83.15</td>
+      <td>78.00</td>
+      <td>0.74</td>
+      <td>0.58</td>
+      <td>0.65</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>logr_localtweet</td>
+      <td>76.90</td>
+      <td>76.67</td>
+      <td>0.75</td>
+      <td>0.55</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>logr</td>
+      <td>83.90</td>
+      <td>78.33</td>
+      <td>0.73</td>
+      <td>0.59</td>
+      <td>0.60</td>
     </tr>
   </tbody>
 </table>
 </div>
 
+
+
+### Random Forest
+A baseline RandomForest classifier is created for comparison to parameter-tuned models.
+
+
+```python
+from sklearn.ensemble import RandomForestClassifier
+
+clf = RandomForestClassifier(n_jobs=-1, random_state=0, n_estimators=100)
+clf.fit(X_train, y_train)
+results_df.loc[len(results_df)] = ['rfc_baseline'] + list(get_results(clf, X_train, y_train, X_test, y_test))
+```
+
+    Accuracy on Training Data: 100.0 %.
+    Accuracy on Test Data: 81.67 %.
+    AUC score:  0.77
+    Predicted Result    0   1
+    Actual Result            
+    0                 192  28
+    1                  27  53
 
 
 
@@ -1607,28 +1610,24 @@ best_params_rf = clf.best_params_
 
 print(best_clf_rf)
 
-results_df.loc[len(results_df)] = ['rfc_gs'] + list(get_results(best_clf_rf))
+results_df.loc[len(results_df)] = ['rfc_gs'] + list(get_results(best_clf_rf, X_train, y_train, X_test, y_test))
 results_df
 ```
-
-    /home/rosles/projects/crisis-data/venv/lib/python3.6/site-packages/sklearn/model_selection/_split.py:1978: FutureWarning: The default value of cv will change from 3 to 5 in version 0.22. Specify it explicitly to silence this warning.
-      warnings.warn(CV_WARNING, FutureWarning)
-
 
     RandomForestClassifier(bootstrap=True, class_weight='balanced',
                            criterion='gini', max_depth=10, max_features='sqrt',
                            max_leaf_nodes=None, min_impurity_decrease=0.0,
                            min_impurity_split=None, min_samples_leaf=1,
                            min_samples_split=2, min_weight_fraction_leaf=0.0,
-                           n_estimators=600, n_jobs=-1, oob_score=False,
+                           n_estimators=300, n_jobs=-1, oob_score=False,
                            random_state=None, verbose=0, warm_start=False)
-    Accuracy on Training Data: 97.16 %.
-    Accuracy on Test Data: 84.33 %.
+    Accuracy on Training Data: 96.83 %.
+    Accuracy on Test Data: 82.0 %.
     AUC score:  0.79
     Predicted Result    0   1
     Actual Result            
-    0                 196  17
-    1                  30  57
+    0                 189  31
+    1                  23  57
 
 
 
@@ -1663,21 +1662,48 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
+      <td>logr_localprofile</td>
+      <td>83.15</td>
+      <td>78.00</td>
+      <td>0.74</td>
+      <td>0.58</td>
+      <td>0.65</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
+      <td>logr_localtweet</td>
+      <td>76.90</td>
+      <td>76.67</td>
+      <td>0.75</td>
+      <td>0.55</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>logr</td>
+      <td>83.90</td>
+      <td>78.33</td>
+      <td>0.73</td>
+      <td>0.59</td>
+      <td>0.60</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>rfc_baseline</td>
+      <td>100.00</td>
+      <td>81.67</td>
       <td>0.77</td>
+      <td>0.65</td>
       <td>0.66</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>rfc_gs</td>
+      <td>96.83</td>
+      <td>82.00</td>
+      <td>0.79</td>
+      <td>0.65</td>
+      <td>0.71</td>
     </tr>
   </tbody>
 </table>
@@ -1697,26 +1723,26 @@ feat_importance
 
 
 
-    [('local_profile_location', 0.14),
-     ('tweet_from_locality', 0.06),
-     ('listed_count', 0.05),
+    [('local_profile_location', 0.17),
      ('ratio_detected', 0.05),
+     ('tweet_from_locality', 0.05),
      ('is_data_source_3', 0.05),
      ('favourites_count', 0.04),
      ('followers_count', 0.04),
+     ('listed_count', 0.04),
+     ('ratio_original', 0.04),
      ('statuses_count', 0.04),
-     ('tweets_per_hour', 0.04),
      ('undirected_eigenvector_centrality', 0.04),
-     ('local_tw_and_local_profile', 0.04),
+     ('description_length', 0.04),
      ('account_age', 0.04),
      ('is_data_source_1', 0.04),
      ('closeness_centrality', 0.03),
-     ('degree_centrality', 0.03),
      ('friends_count', 0.03),
-     ('ratio_original', 0.03),
-     ('description_length', 0.03),
+     ('tweets_per_hour', 0.03),
+     ('local_tw_and_local_profile', 0.03),
      ('day_of_detection', 0.03),
      ('betweenness_centrality', 0.02),
+     ('degree_centrality', 0.02),
      ('eigenvector_centrality', 0.02),
      ('load_centrality', 0.02),
      ('out_degree', 0.02),
@@ -1761,7 +1787,7 @@ X_test = X_test.drop(features_to_remove, axis=1)
 # Use params from previous GridSearch (may not be optimal given pruned set)
 clf = RandomForestClassifier().set_params(**best_params_rf)
 clf.fit(X_train, y_train)
-results_df.loc[len(results_df)] = ['rfc_pruned_0.01'] + list(get_results(clf))
+results_df.loc[len(results_df)] = ['rfc_pruned_0.01'] + list(get_results(clf, X_train, y_train, X_test, y_test))
 
 
 ############ Second round of pruning ############
@@ -1774,7 +1800,7 @@ X_test = X_test.drop(features_to_remove, axis=1)
 # Use params from previous GridSearch (may not be optimal given pruned set)
 clf = RandomForestClassifier().set_params(**best_params_rf)
 clf.fit(X_train, y_train)
-results_df.loc[len(results_df)] = ['rfc_pruned_0.02'] + list(get_results(clf))
+results_df.loc[len(results_df)] = ['rfc_pruned_0.02'] + list(get_results(clf, X_train, y_train, X_test, y_test))
 
 
 # Unprune datasets
@@ -1784,20 +1810,20 @@ X_test = X_test_unpruned
 results_df
 ```
 
-    Accuracy on Training Data: 97.66 %.
-    Accuracy on Test Data: 84.33 %.
-    AUC score:  0.79
+    Accuracy on Training Data: 97.41 %.
+    Accuracy on Test Data: 82.33 %.
+    AUC score:  0.78
     Predicted Result    0   1
     Actual Result            
-    0                 195  18
-    1                  29  58
-    Accuracy on Training Data: 97.58 %.
-    Accuracy on Test Data: 82.0 %.
-    AUC score:  0.75
+    0                 191  29
+    1                  24  56
+    Accuracy on Training Data: 97.33 %.
+    Accuracy on Test Data: 83.67 %.
+    AUC score:  0.81
     Predicted Result    0   1
     Actual Result            
-    0                 195  18
-    1                  36  51
+    0                 192  28
+    1                  21  59
 
 
 
@@ -1832,39 +1858,66 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
+      <td>logr_localprofile</td>
+      <td>83.15</td>
+      <td>78.00</td>
+      <td>0.74</td>
+      <td>0.58</td>
+      <td>0.65</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.77</td>
-      <td>0.66</td>
+      <td>logr_localtweet</td>
+      <td>76.90</td>
+      <td>76.67</td>
+      <td>0.75</td>
+      <td>0.55</td>
+      <td>0.70</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>rfc_pruned_0.01</td>
-      <td>97.66</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.76</td>
-      <td>0.67</td>
+      <td>logr</td>
+      <td>83.90</td>
+      <td>78.33</td>
+      <td>0.73</td>
+      <td>0.59</td>
+      <td>0.60</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>rfc_pruned_0.02</td>
-      <td>97.58</td>
+      <td>rfc_baseline</td>
+      <td>100.00</td>
+      <td>81.67</td>
+      <td>0.77</td>
+      <td>0.65</td>
+      <td>0.66</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>rfc_gs</td>
+      <td>96.83</td>
       <td>82.00</td>
-      <td>0.75</td>
+      <td>0.79</td>
+      <td>0.65</td>
+      <td>0.71</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>rfc_pruned_0.01</td>
+      <td>97.41</td>
+      <td>82.33</td>
+      <td>0.78</td>
+      <td>0.66</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>rfc_pruned_0.02</td>
+      <td>97.33</td>
+      <td>83.67</td>
+      <td>0.81</td>
+      <td>0.68</td>
       <td>0.74</td>
-      <td>0.59</td>
     </tr>
   </tbody>
 </table>
@@ -1886,16 +1939,16 @@ simplefilter(action='ignore', category=FutureWarning)
 # Baseline model
 clf = XGBClassifier(max_depth=6, eval_metric='auc')
 clf.fit(X_train, y_train)
-results_df.loc[len(results_df)] = ['xgb_baseline'] + list(get_results(clf))
+results_df.loc[len(results_df)] = ['xgb_baseline'] + list(get_results(clf, X_train, y_train, X_test, y_test))
 ```
 
-    Accuracy on Training Data: 99.83 %.
+    Accuracy on Training Data: 99.92 %.
     Accuracy on Test Data: 82.0 %.
-    AUC score:  0.74
+    AUC score:  0.77
     Predicted Result    0   1
     Actual Result            
-    0                 197  16
-    1                  38  49
+    0                 193  27
+    1                  27  53
 
 
 
@@ -1906,18 +1959,18 @@ y_weights = y_train.apply(lambda x: (total-y_train.value_counts()[x]) /
                           y_train.value_counts()[x])
 clf = XGBClassifier(max_depth=6, eval_metric='auc')
 clf.fit(X_train, y_train, sample_weight=y_weights)
-results_df.loc[len(results_df)] = ['xgb_weighted'] + list(get_results(clf))
+results_df.loc[len(results_df)] = ['xgb_weighted'] + list(get_results(clf, X_train, y_train, X_test, y_test))
 
 results_df
 ```
 
-    Accuracy on Training Data: 95.75 %.
-    Accuracy on Test Data: 82.33 %.
-    AUC score:  0.8
+    Accuracy on Training Data: 96.25 %.
+    Accuracy on Test Data: 81.33 %.
+    AUC score:  0.81
     Predicted Result    0   1
     Actual Result            
-    0                 181  32
-    1                  21  66
+    0                 180  40
+    1                  16  64
 
 
 
@@ -1952,57 +2005,84 @@ results_df
   <tbody>
     <tr>
       <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
+      <td>logr_localprofile</td>
+      <td>83.15</td>
+      <td>78.00</td>
+      <td>0.74</td>
+      <td>0.58</td>
+      <td>0.65</td>
     </tr>
     <tr>
       <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.77</td>
-      <td>0.66</td>
+      <td>logr_localtweet</td>
+      <td>76.90</td>
+      <td>76.67</td>
+      <td>0.75</td>
+      <td>0.55</td>
+      <td>0.70</td>
     </tr>
     <tr>
       <th>2</th>
-      <td>rfc_pruned_0.01</td>
-      <td>97.66</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.76</td>
-      <td>0.67</td>
+      <td>logr</td>
+      <td>83.90</td>
+      <td>78.33</td>
+      <td>0.73</td>
+      <td>0.59</td>
+      <td>0.60</td>
     </tr>
     <tr>
       <th>3</th>
-      <td>rfc_pruned_0.02</td>
-      <td>97.58</td>
-      <td>82.00</td>
-      <td>0.75</td>
-      <td>0.74</td>
-      <td>0.59</td>
+      <td>rfc_baseline</td>
+      <td>100.00</td>
+      <td>81.67</td>
+      <td>0.77</td>
+      <td>0.65</td>
+      <td>0.66</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>xgb_baseline</td>
-      <td>99.83</td>
+      <td>rfc_gs</td>
+      <td>96.83</td>
       <td>82.00</td>
-      <td>0.74</td>
-      <td>0.75</td>
-      <td>0.56</td>
+      <td>0.79</td>
+      <td>0.65</td>
+      <td>0.71</td>
     </tr>
     <tr>
       <th>5</th>
-      <td>xgb_weighted</td>
-      <td>95.75</td>
+      <td>rfc_pruned_0.01</td>
+      <td>97.41</td>
       <td>82.33</td>
+      <td>0.78</td>
+      <td>0.66</td>
+      <td>0.70</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>rfc_pruned_0.02</td>
+      <td>97.33</td>
+      <td>83.67</td>
+      <td>0.81</td>
+      <td>0.68</td>
+      <td>0.74</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>xgb_baseline</td>
+      <td>99.92</td>
+      <td>82.00</td>
+      <td>0.77</td>
+      <td>0.66</td>
+      <td>0.66</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>xgb_weighted</td>
+      <td>96.25</td>
+      <td>81.33</td>
+      <td>0.81</td>
+      <td>0.62</td>
       <td>0.80</td>
-      <td>0.67</td>
-      <td>0.76</td>
     </tr>
   </tbody>
 </table>
@@ -2040,177 +2120,17 @@ clf.fit(X_train, y_train, sample_weight=y_weights)
 best_clf_xgb = clf.best_estimator_
 best_params_xgb = clf.best_params_
 
-results_df.loc[len(results_df)] = ['xgb_weighted_gs'] + list(get_results(best_clf_xgb))
+results_df.loc[len(results_df)] = ['xgb_weighted_gs'] + list(get_results(best_clf_xgb, X_train, y_train, X_test, y_test))
 print(best_clf_xgb)
 
 results_df
 ```
-
-    Accuracy on Training Data: 90.24 %.
-    Accuracy on Test Data: 81.67 %.
-    AUC score:  0.82
-    Predicted Result    0   1
-    Actual Result            
-    0                 172  41
-    1                  14  73
-    XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
-                  colsample_bynode=1, colsample_bytree=1, eval_metric='auc',
-                  gamma=1, learning_rate=0.05, max_delta_step=0, max_depth=8,
-                  min_child_weight=5, missing=None, n_estimators=200, n_jobs=-1,
-                  nthread=None, objective='binary:logistic', random_state=0,
-                  reg_alpha=0, reg_lambda=1, scale_pos_weight=1, seed=None,
-                  silent=None, subsample=1, verbosity=1)
-
-
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>model</th>
-      <th>train_acc</th>
-      <th>test_acc</th>
-      <th>auc</th>
-      <th>precision</th>
-      <th>recall</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.77</td>
-      <td>0.66</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>rfc_pruned_0.01</td>
-      <td>97.66</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.76</td>
-      <td>0.67</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>rfc_pruned_0.02</td>
-      <td>97.58</td>
-      <td>82.00</td>
-      <td>0.75</td>
-      <td>0.74</td>
-      <td>0.59</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>xgb_baseline</td>
-      <td>99.83</td>
-      <td>82.00</td>
-      <td>0.74</td>
-      <td>0.75</td>
-      <td>0.56</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>xgb_weighted</td>
-      <td>95.75</td>
-      <td>82.33</td>
-      <td>0.80</td>
-      <td>0.67</td>
-      <td>0.76</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>xgb_weighted_gs</td>
-      <td>90.24</td>
-      <td>81.67</td>
-      <td>0.82</td>
-      <td>0.64</td>
-      <td>0.84</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
 
 
 ```python
 feat_importance = sorted(list(zip(X_train, best_clf_xgb.feature_importances_.round(decimals=2))), key=lambda x: x[1], reverse=True)
 feat_importance
 ```
-
-
-
-
-    [('local_profile_location', 0.25),
-     ('tweet_from_locality', 0.13),
-     ('listed_count', 0.05),
-     ('betweenness_centrality', 0.04),
-     ('default_profile', 0.03),
-     ('degree_centrality', 0.03),
-     ('load_centrality', 0.03),
-     ('undirected_eigenvector_centrality', 0.03),
-     ('day_of_detection', 0.03),
-     ('closeness_centrality', 0.02),
-     ('eigenvector_centrality', 0.02),
-     ('favourites_count', 0.02),
-     ('followers_count', 0.02),
-     ('friends_count', 0.02),
-     ('geo_enabled', 0.02),
-     ('ratio_detected', 0.02),
-     ('ratio_original', 0.02),
-     ('statuses_count', 0.02),
-     ('tweets_per_hour', 0.02),
-     ('local_timezone', 0.02),
-     ('local_tw_and_local_tz', 0.02),
-     ('description_length', 0.02),
-     ('has_url', 0.02),
-     ('account_age', 0.02),
-     ('has_extended_profile', 0.01),
-     ('in_degree', 0.01),
-     ('out_degree', 0.01),
-     ('local_tw_and_local_profile', 0.01),
-     ('default_profile_image', 0.0),
-     ('is_translation_enabled', 0.0),
-     ('verified', 0.0),
-     ('three_local_metrics', 0.0),
-     ('local_tz_and_local_profile', 0.0),
-     ('lang_is_en', 0.0),
-     ('has_translator_type', 0.0),
-     ('changed_screen_name', 0.0),
-     ('is_user_class_2', 0.0),
-     ('is_data_source_1', 0.0),
-     ('is_data_source_3', 0.0)]
-
-
 
 Notes from feature importance:
 * Geographic features are expectedly the top two features
@@ -2240,11 +2160,11 @@ X_test = X_test.drop(features_to_remove, axis=1)
 # Use params from previous GridSearch (may not be optimal given pruned set)
 clf = RandomForestClassifier().set_params(**best_params_rf)
 clf.fit(X_train, y_train)
-results_df.loc[len(results_df)] = ['rfc_no_network'] + list(get_results(clf))
+results_df.loc[len(results_df)] = ['rfc_no_network'] + list(get_results(clf, X_train, y_train, X_test, y_test))
 
 xgb = XGBClassifier().set_params(**best_params_xgb)
 xgb.fit(X_train, y_train)
-results_df.loc[len(results_df)] = ['xgb_no_network'] + list(get_results(xgb))
+results_df.loc[len(results_df)] = ['xgb_no_network'] + list(get_results(xgb, X_train, y_train, X_test, y_test))
 
 
 # Unprune datasets
@@ -2254,165 +2174,12 @@ X_test = X_test_unpruned
 results_df
 ```
 
-    Accuracy on Training Data: 96.0 %.
-    Accuracy on Test Data: 84.67 %.
-    AUC score:  0.8
-    Predicted Result    0   1
-    Actual Result            
-    0                 195  18
-    1                  28  59
-    Accuracy on Training Data: 97.91 %.
-    Accuracy on Test Data: 81.33 %.
-    AUC score:  0.73
-    Predicted Result    0   1
-    Actual Result            
-    0                 197  16
-    1                  40  47
-
-
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>model</th>
-      <th>train_acc</th>
-      <th>test_acc</th>
-      <th>auc</th>
-      <th>precision</th>
-      <th>recall</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.77</td>
-      <td>0.66</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>rfc_pruned_0.01</td>
-      <td>97.66</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.76</td>
-      <td>0.67</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>rfc_pruned_0.02</td>
-      <td>97.58</td>
-      <td>82.00</td>
-      <td>0.75</td>
-      <td>0.74</td>
-      <td>0.59</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>xgb_baseline</td>
-      <td>99.83</td>
-      <td>82.00</td>
-      <td>0.74</td>
-      <td>0.75</td>
-      <td>0.56</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>xgb_weighted</td>
-      <td>95.75</td>
-      <td>82.33</td>
-      <td>0.80</td>
-      <td>0.67</td>
-      <td>0.76</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>xgb_weighted_gs</td>
-      <td>90.24</td>
-      <td>81.67</td>
-      <td>0.82</td>
-      <td>0.64</td>
-      <td>0.84</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>rfc_no_network</td>
-      <td>96.00</td>
-      <td>84.67</td>
-      <td>0.80</td>
-      <td>0.77</td>
-      <td>0.68</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>xgb_no_network</td>
-      <td>97.91</td>
-      <td>81.33</td>
-      <td>0.73</td>
-      <td>0.75</td>
-      <td>0.54</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
 As shown above, removing network features from the XGB model causes a significant drop in AUC, precision and recall. The biggest change is in recall, and as this is the most important feature in this application, we must consider collecting these.
 
 
 ```python
 xVar.columns
 ```
-
-
-
-
-    Index(['betweenness_centrality', 'closeness_centrality', 'default_profile',
-           'default_profile_image', 'degree_centrality', 'eigenvector_centrality',
-           'favourites_count', 'followers_count', 'friends_count', 'geo_enabled',
-           'has_extended_profile', 'in_degree', 'is_translation_enabled',
-           'listed_count', 'load_centrality', 'out_degree', 'ratio_detected',
-           'ratio_original', 'statuses_count', 'tweets_per_hour',
-           'undirected_eigenvector_centrality', 'verified',
-           'local_profile_location', 'local_timezone', 'tweet_from_locality',
-           'three_local_metrics', 'local_tw_and_local_profile',
-           'local_tw_and_local_tz', 'local_tz_and_local_profile',
-           'description_length', 'lang_is_en', 'has_translator_type', 'has_url',
-           'changed_screen_name', 'account_age', 'day_of_detection',
-           'is_user_class_2', 'is_data_source_1', 'is_data_source_3'],
-          dtype='object')
-
-
 
 
 ```python
@@ -2465,376 +2232,16 @@ clf.fit(X_train, y_train, sample_weight=y_weights)
 best_clf_xgb = clf.best_estimator_
 best_params_xgb = clf.best_params_
 
-results_df.loc[len(results_df)] = ['xgb_weighted_gs'] + list(get_results(best_clf_xgb))
+results_df.loc[len(results_df)] = ['xgb_weighted_gs'] + list(get_results(best_clf_xgb, X_train, y_train, x_test, y_test))
 print(best_clf_xgb)
 print(get_results(best_clf_xgb))
 results_df
 ```
 
-    Fitting 5 folds for each of 20 candidates, totalling 100 fits
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0, score=0.886, total=   0.1s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0 
-
-
-    [Parallel(n_jobs=1)]: Using backend SequentialBackend with 1 concurrent workers.
-    [Parallel(n_jobs=1)]: Done   1 out of   1 | elapsed:    0.1s remaining:    0.0s
-
-
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0, score=0.868, total=   0.1s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0, score=0.870, total=   0.1s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0 
-
-
-    [Parallel(n_jobs=1)]: Done   2 out of   2 | elapsed:    0.2s remaining:    0.0s
-
-
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0, score=0.886, total=   0.1s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=5, max_depth=2, learning_rate=0.1, gamma=1.5, colsample_bytree=1.0, score=0.883, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8, score=0.866, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8, score=0.834, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8, score=0.864, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8, score=0.865, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.4, reg_lambda=4.5, reg_alpha=1, n_estimators=100, min_child_weight=1, max_depth=2, learning_rate=0.01, gamma=2, colsample_bytree=0.8, score=0.865, total=   0.1s
-    [CV] subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0 
-    [CV]  subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0, score=0.858, total=   0.2s
-    [CV] subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0 
-    [CV]  subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0, score=0.830, total=   0.2s
-    [CV] subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0 
-    [CV]  subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0, score=0.865, total=   0.2s
-    [CV] subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0 
-    [CV]  subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0, score=0.862, total=   0.2s
-    [CV] subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0 
-    [CV]  subsample=0.2, reg_lambda=4.5, reg_alpha=0.5, n_estimators=250, min_child_weight=1, max_depth=2, learning_rate=0.001, gamma=0.5, colsample_bytree=1.0, score=0.859, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0, score=0.884, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0, score=0.866, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0, score=0.872, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0, score=0.875, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=0.1, colsample_bytree=1.0, score=0.883, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0 
-    [CV]  subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0, score=0.873, total=   1.0s
-    [CV] subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0 
-    [CV]  subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0, score=0.848, total=   1.0s
-    [CV] subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0 
-    [CV]  subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0, score=0.858, total=   1.0s
-    [CV] subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0 
-    [CV]  subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0, score=0.862, total=   1.0s
-    [CV] subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0 
-    [CV]  subsample=0.5, reg_lambda=4.5, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=1.0, score=0.860, total=   1.0s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6, score=0.859, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6, score=0.857, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6, score=0.860, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6, score=0.865, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=3, max_depth=10, learning_rate=0.001, gamma=0.01, colsample_bytree=0.6, score=0.856, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.872, total=   0.4s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.855, total=   0.4s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.857, total=   0.4s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.860, total=   0.4s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.869, total=   0.4s
-    [CV] subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.888, total=   1.8s
-    [CV] subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.866, total=   1.8s
-    [CV] subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.864, total=   1.8s
-    [CV] subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.894, total=   1.8s
-    [CV] subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=1, max_depth=7, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.878, total=   1.8s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0, score=0.883, total=   0.6s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0, score=0.844, total=   0.6s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0, score=0.865, total=   0.6s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0, score=0.880, total=   0.6s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=250, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=1.0, score=0.882, total=   0.6s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6, score=0.867, total=   0.3s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6, score=0.846, total=   0.3s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6, score=0.857, total=   0.3s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6, score=0.853, total=   0.3s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0.5, n_estimators=250, min_child_weight=7, max_depth=7, learning_rate=0.001, gamma=2, colsample_bytree=0.6, score=0.857, total=   0.3s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.875, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.855, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.866, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.859, total=   0.1s
-    [CV] subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.4, reg_lambda=2, reg_alpha=0, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.01, gamma=0.3, colsample_bytree=0.6, score=0.868, total=   0.1s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8, score=0.871, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8, score=0.851, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8, score=0.853, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8, score=0.863, total=   0.2s
-    [CV] subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8 
-    [CV]  subsample=0.7, reg_lambda=1, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=10, learning_rate=0.001, gamma=0.3, colsample_bytree=0.8, score=0.866, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.865, total=   0.1s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.847, total=   0.1s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.854, total=   0.1s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.851, total=   0.1s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=7, max_depth=4, learning_rate=0.001, gamma=0.3, colsample_bytree=0.6, score=0.846, total=   0.1s
-    [CV] subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8 
-    [CV]  subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8, score=0.876, total=   0.4s
-    [CV] subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8 
-    [CV]  subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8, score=0.847, total=   0.4s
-    [CV] subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8 
-    [CV]  subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8, score=0.860, total=   0.4s
-    [CV] subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8 
-    [CV]  subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8, score=0.856, total=   0.4s
-    [CV] subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8 
-    [CV]  subsample=0.2, reg_lambda=1.5, reg_alpha=0, n_estimators=500, min_child_weight=5, max_depth=7, learning_rate=0.1, gamma=0.01, colsample_bytree=0.8, score=0.861, total=   0.4s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6, score=0.868, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6, score=0.855, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6, score=0.863, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6, score=0.859, total=   0.2s
-    [CV] subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=3, reg_alpha=1, n_estimators=100, min_child_weight=5, max_depth=7, learning_rate=0.01, gamma=1.5, colsample_bytree=0.6, score=0.860, total=   0.2s
-    [CV] subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0, score=0.883, total=   0.5s
-    [CV] subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0, score=0.863, total=   0.5s
-    [CV] subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0, score=0.876, total=   0.5s
-    [CV] subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0, score=0.879, total=   0.5s
-    [CV] subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0 
-    [CV]  subsample=0.4, reg_lambda=1, reg_alpha=0, n_estimators=500, min_child_weight=7, max_depth=2, learning_rate=0.01, gamma=0.1, colsample_bytree=1.0, score=0.882, total=   0.5s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0, score=0.876, total=   1.5s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0, score=0.878, total=   1.5s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0, score=0.857, total=   1.5s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0, score=0.882, total=   1.5s
-    [CV] subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0 
-    [CV]  subsample=0.7, reg_lambda=3, reg_alpha=0, n_estimators=500, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=1, colsample_bytree=1.0, score=0.873, total=   1.5s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8, score=0.878, total=   0.6s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8, score=0.875, total=   0.6s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8, score=0.874, total=   0.6s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8, score=0.891, total=   0.6s
-    [CV] subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8 
-    [CV]  subsample=0.6, reg_lambda=1, reg_alpha=1, n_estimators=250, min_child_weight=1, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.8, score=0.877, total=   0.6s
-    [CV] subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6, score=0.875, total=   1.6s
-    [CV] subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6, score=0.873, total=   1.5s
-    [CV] subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6, score=0.857, total=   1.5s
-    [CV] subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6, score=0.880, total=   1.5s
-    [CV] subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6 
-    [CV]  subsample=0.6, reg_lambda=1.5, reg_alpha=0, n_estimators=1000, min_child_weight=3, max_depth=7, learning_rate=0.1, gamma=2, colsample_bytree=0.6, score=0.869, total=   1.5s
-    [CV] subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6, score=0.889, total=   0.5s
-    [CV] subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6, score=0.859, total=   0.5s
-    [CV] subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6, score=0.871, total=   0.5s
-    [CV] subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6, score=0.870, total=   0.5s
-    [CV] subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6 
-    [CV]  subsample=0.5, reg_lambda=2, reg_alpha=1, n_estimators=500, min_child_weight=7, max_depth=4, learning_rate=0.1, gamma=1.5, colsample_bytree=0.6, score=0.875, total=   0.5s
-
-
-    [Parallel(n_jobs=1)]: Done 100 out of 100 | elapsed:   53.1s finished
-
-
-    XGBClassifier(base_score=0.5, booster='gbtree', colsample_bylevel=1,
-                  colsample_bynode=1, colsample_bytree=0.8, gamma=2,
-                  learning_rate=0.1, max_delta_step=0, max_depth=7,
-                  min_child_weight=1, missing=None, n_estimators=250, n_jobs=1,
-                  nthread=None, objective='binary:logistic', random_state=0,
-                  reg_alpha=1, reg_lambda=1, scale_pos_weight=1, seed=None,
-                  silent=None, subsample=0.6, verbosity=1)
-    Accuracy on Training Data: 88.41 %.
-    Accuracy on Test Data: 81.0 %.
-    AUC score:  0.82
-    Predicted Result    0   1
-    Actual Result            
-    0                 171  42
-    1                  15  72
-    (88.41, 81.0, 0.82, 0.63, 0.83)
-
-
 
 ```python
 results_df
 ```
-
-
-
-
-<div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>model</th>
-      <th>train_acc</th>
-      <th>test_acc</th>
-      <th>auc</th>
-      <th>precision</th>
-      <th>recall</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>rfc_baseline</td>
-      <td>99.92</td>
-      <td>83.67</td>
-      <td>0.78</td>
-      <td>0.76</td>
-      <td>0.64</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>rfc_gs</td>
-      <td>97.16</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.77</td>
-      <td>0.66</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>rfc_pruned_0.01</td>
-      <td>97.66</td>
-      <td>84.33</td>
-      <td>0.79</td>
-      <td>0.76</td>
-      <td>0.67</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>rfc_pruned_0.02</td>
-      <td>97.58</td>
-      <td>82.00</td>
-      <td>0.75</td>
-      <td>0.74</td>
-      <td>0.59</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>xgb_baseline</td>
-      <td>99.83</td>
-      <td>82.00</td>
-      <td>0.74</td>
-      <td>0.75</td>
-      <td>0.56</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>xgb_weighted</td>
-      <td>95.75</td>
-      <td>82.33</td>
-      <td>0.80</td>
-      <td>0.67</td>
-      <td>0.76</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>xgb_weighted_gs</td>
-      <td>90.24</td>
-      <td>81.67</td>
-      <td>0.82</td>
-      <td>0.64</td>
-      <td>0.84</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>rfc_no_network</td>
-      <td>96.00</td>
-      <td>84.67</td>
-      <td>0.80</td>
-      <td>0.77</td>
-      <td>0.68</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>xgb_no_network</td>
-      <td>97.91</td>
-      <td>81.33</td>
-      <td>0.73</td>
-      <td>0.75</td>
-      <td>0.54</td>
-    </tr>
-    <tr>
-      <th>9</th>
-      <td>xgb_weighted_rs</td>
-      <td>88.41</td>
-      <td>81.00</td>
-      <td>0.82</td>
-      <td>0.63</td>
-      <td>0.83</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
 
 
 ```python
