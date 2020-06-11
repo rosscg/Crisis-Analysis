@@ -715,6 +715,7 @@ The following image shows the output of a community detection algorithm which ha
 
 <img src="./data/harvey_user_location/img/harvey-network-structure-community.png" alt="network-structure-community" style="width: 600px;"/>
 
+## Evaluating Community Algorithms
 In the following section, the original dataframe is enhanced with modularity metrics. These are features which are calculated based upon the graph structure of the user friend/follower network. There are a number of community detection algorithms, so a set of these have been calculated to be tested and compared for association to the target (witness) class.
 
 Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were performed in a separate script for the sake of testing and will ideally be calculated by the data collection software at the end of the collection process in future iterations.
@@ -835,11 +836,11 @@ df_comm.head()
 
 
 ```
+# Create list of community algorithm column names
+comm_cols = list(df_comm.columns)
+
 # Merge dataframes
 users_df = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
-
-# Create list of community algorithm output columns
-comm_cols = list(df_comm.columns)
 
 users_df.head()
 ```
@@ -1011,12 +1012,14 @@ users_df.head()
     </tr>
   </tbody>
 </table>
-<p>5 rows × 60 columns</p>
+<p>5 rows × 70 columns</p>
 </div>
 
 
 
 As chi-square tests are typically recommended to require contingency tables with values of at least 5, the small communities are discarded (also, some algorithms create many communities of 1-2 members, which will not be useful in generalisation of the model).
+
+TODO: This only elimanates cells where the observed value is less than 5, this rule should also be applied to expected value cells.
 
 
 ```
@@ -1039,7 +1042,7 @@ This is shown as a dotted line on the plots below.
 import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [12, 8]
 
-
+# NOTE: required input is a list of series, not dataframes
 def plot_dfs_as_bar(df_list, axhline=None):
     if len(df_list) == 1:
         df_list[0].plot(kind='bar', title=df_list[0].name, colormap='Spectral', rot=45)
@@ -1083,7 +1086,7 @@ plot_dfs_as_bar(df_list, ex_pos_proportion)
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
 
-The charts shown above suggest that the highest proportion of positive classes appear in the largest, or second-largest communities (as the labels have been ranked in order of size). This is significant -- a model cannot be trained on community label as a feature, as the labels are qualitative and will be different each time an algorithm runs on a network. Therefore these features cannot generalise to new datasets. The feature that is supplied must therefore be something which is generalisable; in this case, the ranking of the community by size my be appropriate (for example, a feature which represents whether a user is in the largest detected community). Alternatively, communities may exhibit different characteristics such as connectedness. This will be explored later.
+The charts shown above suggest that the highest proportion of positive classes appear in the largest, or second-largest communities (as the labels have been ranked in order of size). This is significant -- a model cannot be trained on community label as a feature, as the labels are qualitative and will be different each time an algorithm runs on a network. Therefore these features cannot generalise to new datasets. The feature that is supplied must therefore be something which is generalisable; in this case, the ranking of the community by size my be appropriate (for example, a feature which represents whether a user is in the largest detected community). Alternatively, communities may exhibit different characteristics such as connectedness. This will be explored later. The higher proportions seen in some of the later communities are less relevant as these are of a much smaller size. Thus the high proportions are 'easier' to achieve, and as smaller communities are more likely to represent unique cases, they are less likely to generalise.
 
 The next steps in the analyis of the validity of this approach is the calculate whether the disparities observed above are statistically significant. That is, whether these associations could have been observed by chance.
 
@@ -1106,7 +1109,7 @@ def chi_square_of_df_cols(df, col1, col2):
 y_col = 'coded_as_witness'
 data = [[col] + list(chi_square_of_df_cols(users_df, y_col, col)[:2]) for col in comm_cols]
 
-chi2a_df = pd.DataFrame(data=data, columns=['feature', 'chi2', 'p-val'])
+chi2a_df = pd.DataFrame(data=data, columns=['feature', 'chi-square-a', 'p-val'])
 #chi2a_df.plot(kind='bar', y='chi2', x='feature', rot=45)
 chi2a_df
 ```
@@ -1133,7 +1136,7 @@ chi2a_df
     <tr style="text-align: right;">
       <th></th>
       <th>feature</th>
-      <th>chi2</th>
+      <th>chi-square-a</th>
       <th>p-val</th>
     </tr>
   </thead>
@@ -1178,6 +1181,8 @@ For all features, the analysis produced a significant $\chi^2$ value, well beyon
 
 In the following cells, a number of other measures of association are tested, including the `sklearn` implementation of chi-square.
 
+We are now interested in selecting the community algorithm which is most useful in class prediction.
+
 
 ```
 from sklearn.feature_selection import chi2
@@ -1187,7 +1192,7 @@ temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
 X = temp_df[comm_cols]
 y = temp_df['coded_as_witness']
 
-chi2b_df = pd.DataFrame(data={'feature': comm_cols, 'chi2': chi2(X,y)[0], 'p-val': chi2(X,y)[1]})
+chi2b_df = pd.DataFrame(data={'feature': comm_cols, 'chi-square-b': chi2(X,y)[0], 'p-val': chi2(X,y)[1]})
 #chi2b_df.plot(kind='bar', y='chi2', x='feature', rot=45)
 chi2b_df
 ```
@@ -1214,7 +1219,7 @@ chi2b_df
     <tr style="text-align: right;">
       <th></th>
       <th>feature</th>
-      <th>chi2</th>
+      <th>chi-square-b</th>
       <th>p-val</th>
     </tr>
   </thead>
@@ -1443,8 +1448,8 @@ for col in comm_cols:
     X = X.loc[~X[col].isna()]
 
 ##tree = DecisionTreeRegressor().fit(X, y)
-tree = DecisionTreeClassifier().fit(X, y)
-#tree = RandomForestClassifier().fit(X, y)
+#tree = DecisionTreeClassifier().fit(X, y)
+tree = RandomForestClassifier().fit(X, y)
 
 rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_), 
                columns =['feature', 'importance']) 
@@ -1452,6 +1457,10 @@ rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_),
 #rf_df.plot(kind='bar', x='feature', rot=45)
 rf_df
 ```
+
+    /home/rosles/projects/crisis-data/venv/lib/python3.6/site-packages/sklearn/ensemble/forest.py:245: FutureWarning: The default value of n_estimators will change from 10 in version 0.20 to 100 in 0.22.
+      "10 in version 0.20 to 100 in 0.22.", FutureWarning)
+
 
 
 
@@ -1482,27 +1491,27 @@ rf_df
     <tr>
       <th>0</th>
       <td>c_modularity</td>
-      <td>0.178260</td>
+      <td>0.245265</td>
     </tr>
     <tr>
       <th>1</th>
       <td>c_label_prop</td>
-      <td>0.036715</td>
+      <td>0.092487</td>
     </tr>
     <tr>
       <th>2</th>
       <td>c_label_prop_asyn</td>
-      <td>0.058867</td>
+      <td>0.147841</td>
     </tr>
     <tr>
       <th>3</th>
       <td>c_fluid</td>
-      <td>0.190152</td>
+      <td>0.228331</td>
     </tr>
     <tr>
       <th>4</th>
       <td>louvain</td>
-      <td>0.536006</td>
+      <td>0.286075</td>
     </tr>
   </tbody>
 </table>
@@ -1512,38 +1521,25 @@ rf_df
 
 
 ```
-# #df_list = [chi2a_df, chi2b_df, cramers_df, theils_df, rf_df]
+df_list = [chi2a_df, chi2b_df, cramers_df, theils_df, rf_df]
+indices = chi2a_df['feature'].values
+df_list = [x.set_index('feature').iloc[:,0] for x in df_list]
 
-# df_list = [chi2a_df['chi2']]
-# #plot_dfs_as_bar([chi2a_df['chi2'].index = chi2a_df['feature'].values])
-# #chi2a_df['chi2']
-# #x = chi2a_df['chi2'].copy()
-# chi2a_df['chi2'].index = chi2a_df['feature']
-# chi2a_df['chi2']
-# plot_dfs_as_bar([chi2a_df['chi2']])
+plot_dfs_as_bar(df_list)
+```
+
+
+![png](harvey_user_location_data_prep_files/harvey_user_location_data_prep_53_0.png)
+
+
+
+```
+
 ```
 
 
 ```
-# # Combine DFs:
 
-# dfs = [rf_df,
-#         chi2_df.drop(['p-val'], axis=1),
-#         chi2b_df.drop(['p-val'], axis=1),
-#         cramers_df,
-#         theils_df
-#       ]
-
-# temp_df = dfs[0].copy()
-# for d in dfs[1:]:
-#     temp_df = pd.merge(left=temp_df, right=d, left_on='feature', right_on='feature', suffixes=('a', 'b'))
-
-# # normalise chi2 columns
-# temp_df['chi2a'] = temp_df['chi2a'] / temp_df['chi2a'].max()
-# temp_df['chi2b'] = temp_df['chi2b'] / temp_df['chi2b'].max()
-
-# temp_df.plot(kind='bar', x='feature', rot=45)  
-# temp_df
 ```
 
 
