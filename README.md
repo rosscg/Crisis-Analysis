@@ -21,6 +21,3 @@ the repository here: https://github.com/rosscg/crisis-data
 In the notebooks, data is pulled directly from the local Postgres databases
 using Django syntax (via Django shell_plus) as the data collection software
 uses the Django framework to record its data.
-
-## TODO
-Fix dataframe style formatting in markdown conversion.
