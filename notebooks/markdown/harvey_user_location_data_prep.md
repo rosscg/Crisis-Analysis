@@ -15,7 +15,7 @@ Data was coded using an interface built into the collection software by a primar
 First we get all the coding instances made by the primary and secondary coders, and check the total codings of each class. There may be multiple coding dimensions (sets of coding schema), in which case the code requires adjustment to constrain to one.
 
 
-```python
+```
 import pandas as pd
 
 # Get coding instances of user objects:
@@ -59,7 +59,7 @@ if len(dimensions) > 1:
 We then create a dataframe of all users which have been coded by the primary coder to create the initial dataset. The subjects of the secondary coder are a subset of this set by design.
 
 
-```python
+```
 # Get all Users coded by primary coder:
 # (exclude data_code_id=0 as this is the temporary 'to be coded' class)
 users = User.objects.filter(coding_for_user__coding_id=1, 
@@ -103,7 +103,7 @@ users_df.count()[users_df.count() != account_codings.count()].sort_values(ascend
 * Various 0 value fields had been added to the database schema but were not implemented at the time of collection. These can be safely dropped.
 
 
-```python
+```
 # Dropping empty columns
 empty_cols = users_df.columns[users_df.isnull().all()]
 users_df.drop(empty_cols, axis=1, inplace=True)
@@ -112,7 +112,7 @@ users_df.drop(empty_cols, axis=1, inplace=True)
 We can also drop columns which have a single value, as they provide no differentiation:
 
 
-```python
+```
 # Drop columns with only one unique value:
 for col in users_df.columns:
     if len(users_df[col].value_counts()) <= 1:
@@ -140,7 +140,7 @@ The location the user sets in their profile as a string is evaluated and a local
 Note that as this field can be set manually, it is unverifiable and therefore not a perfect representation of location, even where it exists. Users may neglect to update their location after moving, and some observations were made of users setting their location to that of a disaster event as a 'show of solidarity'.
 
 
-```python
+```
 ## This block supports manual coding of locations as local or non-local.
 ## It has been superceded by the next block which uses the Googlemaps API
 
@@ -168,7 +168,7 @@ Note that as this field can be set manually, it is unverifiable and therefore no
 ```
 
 
-```python
+```
 import re
 
 def parse_coordinates(string):
@@ -194,7 +194,7 @@ def parse_coordinates(string):
 ```
 
 
-```python
+```
 import yaml
 import googlemaps
 
@@ -246,7 +246,7 @@ def is_local(location, boxes, known_localities=[]):
 ```
 
 
-```python
+```
 # Bounding boxes used for Hurricane Harvey dataset:
 boxes = [[(29.1197,-99.9590682),(26.5486063,-97.5021)],
         [(30.3893434,-97.5021),(26.5486063,-93.9790001)]]
@@ -275,7 +275,7 @@ with open('data/harvey_user_location/location_list_from_api_non_local.txt', 'w')
 ```
 
 
-```python
+```
 # Use cached locations instead of querying API:
 #users_df["location"] = users_df["location"].str.lower().str.strip()
 #local_location_list_cached = []
@@ -290,7 +290,7 @@ Timezone data provided by Twitter when capturing the user objects is less specif
 As this data field has been deprecated by Twitter, it will not be available in new data sets.
 
 
-```python
+```
 # View most prevalent time zones:
 print(users_df['time_zone'].value_counts().head())
 
@@ -314,7 +314,7 @@ Accounts were manually coded as 'local' or 'non-local'.
 Coders were shown the user account details as well as the Twitter stream of the user. The coders were instructed to determine whether the user account was in an area affected by the hurricane at any point during the data collection period. Therefore, the term 'local' may be misleading to the reader, as the definition given to the coders will include anyone visiting the area as, for example, a responder or aid worker. This larger set of 'on the ground' users is a more useful target for classification.
 
 
-```python
+```
 # Create column to represent manual coding:
 users_df['coded_as'] = \
     users_df['screen_name'].apply(lambda x: account_codings.get(user__screen_name = x).data_code.name)
@@ -334,7 +334,7 @@ The 'Unsure' code is represented as `False` values in both the `coded_as_witness
 While the Tweets detected by the system may not contain GPS data, the author may have made other GPS-enabled Tweets during the collection period from which we can infer location. We create a column representing whether the user made any geolocated Tweets within the bounding box during the collection period.
 
 
-```python
+```
 # Check whether any of a user's Tweets fall within the bounding box and update column:
 # This will take several minutes to run
 
@@ -515,7 +515,7 @@ for i in range(len(users)):
 The dataframe is exported to a csv file before further manipulation (and column dropping) to avoid repeating the expensive tasks above.
 
 
-```python
+```
 import pandas as pd
 path = 'data/harvey_user_location/df_users_temp.csv'
 
@@ -525,7 +525,7 @@ users_df.to_csv(path)
 ```
 
 
-```python
+```
 # Re-import and check rows match:
 orig_shape = users_df.shape
 users_df_temp = pd.read_csv(path, index_col=0)
@@ -542,7 +542,7 @@ New features are synthesised from existing data.
 Columns are added which represent the age of the user account (at the time of original collection) and at which point during the event the account was first detected by the stream.
 
 
-```python
+```
 # Create columns to represent age of account at time of detection, and how soon
 # after the beginning of the event that the account was first detected.
 
@@ -578,7 +578,7 @@ An error in data collection allowed some `in_degree` and `out_degree` values to 
 Note: It is possible that other entries have values one lower than what they should be.
 
 
-```python
+```
 # Fix negative values in in_degree and out_degree: an error from data collection:
 users_df.loc[users_df['in_degree'] < 0, 'in_degree'] = 0
 users_df.loc[users_df['out_degree'] < 0, 'out_degree'] = 0
@@ -588,7 +588,7 @@ users_df.loc[users_df['out_degree'] < 0, 'out_degree'] = 0
 Qualitative columns are converted into formats interpretable by a model.
 
 
-```python
+```
 # Create column to represent length of profile description:
 users_df['description_length'] = users_df.description.str.len()
 #users_df = users_df.drop(['description_length'], axis=1)
@@ -611,7 +611,7 @@ users_df['changed_screen_name'] = users_df['old_screen_name'].notnull()
 We check for columns which should be represented categorically by counting the unique values in each column (under the assumption that categorical variables will have fewer than 20 unique values):
 
 
-```python
+```
 # Check columns for categorical candidates:
 for col in users_df.columns:
     if len(users_df[col].value_counts()) <= 20:
@@ -634,7 +634,7 @@ for col in users_df.columns:
 `data_source` is a categorical feature, so we re-encode it as a binary value. Here, the values of 1 and 3 are arbitrary (the 2 value was not implemented in the collection process).
 
 
-```python
+```
 # Encoding categorical columns as one-hot:
 # data_source==1 is not encoded as we only need n-1 columns to represent n categories.
 users_df['is_data_source_3'] = users_df['data_source'] == 3.
@@ -644,7 +644,7 @@ users_df = users_df.drop(['data_source'], axis=1)
 True/False columns are converted to 1/0 values for model compatibility
 
 
-```python
+```
 # Convert True/False columns to 1/0
 print('Converting columns from boolean to binary:\n')
 for col in users_df.columns:
@@ -678,7 +678,7 @@ for col in users_df.columns:
 ## Export to File
 
 
-```python
+```
 import pandas as pd
 
 path = 'data/harvey_user_location/df_users.csv'
@@ -700,3 +700,853 @@ else:
     Dataframe exported to CSV.
     (1500, 45)
 
+
+# Testing Community Detection Data
+
+<img src="./data/harvey_user_location/img/harvey-network-structure.png" alt="network-structure" style="width: 600px;"/>
+
+A visual inspection of the follower/friend network of detected users (pictured above) shows a clear community structure. This suggests that there are certain user features that influence the propensity for a user to follow another user with similar features. These may be features which we have observed and recorded, or other features which we cannot predict. This can be tested by using community detection algorithms to partition the nodes of the graph into these communities, and then comparing these partitions to features with which they may be associated. Primarily, we are interested in whether these communities are related to whether a user is a 'witness' or not, as per our manual coding. If this is the case, the community metrics can be a useful feature in our models.
+
+The image below shows a representation of the same network structure, where only the 1500 coded nodes are displayed in colours which represent their codes. The general grouping of orange nodes towards one section of the graph which corresponds with a community cluster shown in the original graph structure suggests that this community contains a greater proportion of witness nodes and therefore is a dependent feature. A preliminary hypothesis is that local users are more likely to follow one another (thus forming this community) and are also more likely to be witnesses. If true, this community could accurately predict which users are local and therefore, more likely to be witnesses.
+
+<img src="./data/harvey_user_location/img/harvey-network-structure-coded.png" alt="network-structure-coded" style="width: 600px;"/>
+
+The following image shows the output of a community detection algorithm which has partitioned the graph. In this example, the pink community appears to represent the witness group shown in the previous image.
+
+<img src="./data/harvey_user_location/img/harvey-network-structure-community.png" alt="network-structure-community" style="width: 600px;"/>
+
+In the following section, the original dataframe is enhanced with modularity metrics. These are features which are calculated based upon the graph structure of the user friend/follower network. There are a number of community detection algorithms, so a set of these have been calculated to be tested and compared for association to the target (witness) class.
+
+Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were performed in a separate script for the sake of testing and will ideally be calculated by the data collection software at the end of the collection process in future iterations.
+
+The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges. 
+
+As most algorithms require an undirected graph, the direction of relationships was ignored.
+
+Communities are labelled as numbers according to their ranking in size (where 0 is the largest), thus the labels have some level of ordinality.
+
+
+```
+# Open original Dataframe
+import pandas as pd
+
+path = 'data/harvey_user_location/df_users.csv'
+
+users_df = pd.read_csv(path, index_col=0)
+users_df.shape
+```
+
+
+
+
+    (1500, 45)
+
+
+
+
+```
+# Open graph and convert to dataframe
+import networkx as nx
+
+path = '../gephi_network_data_harvey_community_v2.gexf'
+G = nx.read_gexf(path)
+nodes = G.nodes(data=True)
+
+df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
+df_comm = df_comm.drop(['user_class', 'user_code', 'label'], axis=1)
+#df_comm = df_comm.reset_index(drop=True)
+df_comm.head()
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>c_modularity</th>
+      <th>c_label_prop</th>
+      <th>c_label_prop_asyn</th>
+      <th>c_fluid</th>
+      <th>louvain</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0044Tamil</th>
+      <td>2</td>
+      <td>4</td>
+      <td>803</td>
+      <td>7</td>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th>007rogerbmoore</th>
+      <td>5</td>
+      <td>0</td>
+      <td>161</td>
+      <td>2</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>01fmoreira</th>
+      <td>3</td>
+      <td>0</td>
+      <td>1</td>
+      <td>3</td>
+      <td>4</td>
+    </tr>
+    <tr>
+      <th>0KTOBR</th>
+      <td>5</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>0x41_0x48</th>
+      <td>233</td>
+      <td>854</td>
+      <td>1075</td>
+      <td>4</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```
+# Merge dataframes
+users_df = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
+
+# Create list of community algorithm output columns
+comm_cols = list(df_comm.columns)
+
+users_df.head()
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>added_at</th>
+      <th>betweenness_centrality</th>
+      <th>closeness_centrality</th>
+      <th>created_at</th>
+      <th>default_profile</th>
+      <th>default_profile_image</th>
+      <th>degree_centrality</th>
+      <th>description</th>
+      <th>eigenvector_centrality</th>
+      <th>favourites_count</th>
+      <th>...</th>
+      <th>c_modularity_y</th>
+      <th>c_label_prop_y</th>
+      <th>c_label_prop_asyn_y</th>
+      <th>c_fluid_y</th>
+      <th>louvain_y</th>
+      <th>c_modularity</th>
+      <th>c_label_prop</th>
+      <th>c_label_prop_asyn</th>
+      <th>c_fluid</th>
+      <th>louvain</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>2017-08-28 20:42:59.273657+00:00</td>
+      <td>0.000043</td>
+      <td>0.135798</td>
+      <td>2013-03-01 19:23:11+00:00</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0.000304</td>
+      <td>If You Want To Live A Happy Life ❇ change your...</td>
+      <td>3.905631e-07</td>
+      <td>2030</td>
+      <td>...</td>
+      <td>3.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+      <td>2.0</td>
+      <td>1.0</td>
+      <td>3.0</td>
+      <td>0.0</td>
+      <td>4.0</td>
+      <td>2.0</td>
+      <td>1.0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2017-08-30 13:58:20.296918+00:00</td>
+      <td>0.000015</td>
+      <td>0.122066</td>
+      <td>2014-01-20 00:34:57+00:00</td>
+      <td>1</td>
+      <td>0</td>
+      <td>0.000243</td>
+      <td>Employee Giving PM @Microsoft.A daydreamer w/ ...</td>
+      <td>1.785776e-07</td>
+      <td>1015</td>
+      <td>...</td>
+      <td>5.0</td>
+      <td>0.0</td>
+      <td>779.0</td>
+      <td>6.0</td>
+      <td>6.0</td>
+      <td>5.0</td>
+      <td>0.0</td>
+      <td>779.0</td>
+      <td>6.0</td>
+      <td>6.0</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>2017-08-26 19:51:45.107222+00:00</td>
+      <td>0.000000</td>
+      <td>0.077120</td>
+      <td>2012-07-24 13:47:47+00:00</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0.000061</td>
+      <td>Making an impact isn’t something reserved for ...</td>
+      <td>8.518251e-14</td>
+      <td>12</td>
+      <td>...</td>
+      <td>4.0</td>
+      <td>655.0</td>
+      <td>1336.0</td>
+      <td>0.0</td>
+      <td>15.0</td>
+      <td>4.0</td>
+      <td>655.0</td>
+      <td>1336.0</td>
+      <td>0.0</td>
+      <td>15.0</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2017-08-26 11:13:05.769123+00:00</td>
+      <td>0.000383</td>
+      <td>0.167070</td>
+      <td>2010-12-16 17:30:04+00:00</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0.000668</td>
+      <td>Eyeing global entropy through a timeline windo...</td>
+      <td>4.315565e-05</td>
+      <td>347</td>
+      <td>...</td>
+      <td>2.0</td>
+      <td>0.0</td>
+      <td>1.0</td>
+      <td>7.0</td>
+      <td>4.0</td>
+      <td>2.0</td>
+      <td>0.0</td>
+      <td>1.0</td>
+      <td>7.0</td>
+      <td>4.0</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>2017-08-26 14:19:23.604361+00:00</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>2009-04-24 12:08:14+00:00</td>
+      <td>0</td>
+      <td>0</td>
+      <td>NaN</td>
+      <td>Producer. Show Control Designer. Project Coord...</td>
+      <td>NaN</td>
+      <td>25</td>
+      <td>...</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+<p>5 rows × 60 columns</p>
+</div>
+
+
+
+As chi-square tests are typically recommended to require contingency tables with values of at least 5, the small communities are discarded (also, some algorithms create many communities of 1-2 members, which will not be useful in generalisation of the model).
+
+
+```
+# Ignore small communities where observed cases are too low (required for chi-square tests)
+MIN_COMMUNITY_SIZE = 5
+
+for col in comm_cols:
+    s = users_df[col].value_counts()
+    #s = users_df.loc[users_df['coded_as_witness']==1, col].value_counts()
+    users_df.loc[~users_df[col].isin(s.index[s >= MIN_COMMUNITY_SIZE]), col] = np.NaN
+```
+
+As a preliminary visual investigation into the relationship between community and code, we can check the proportion of nodes within a community that are coded as positive cases (witnesses). In an independent case, we would expect these ratios to be similar, and reflect the overall ratio of cases, which is:
+$$\frac{386}{1500} = 0.257$$
+This is shown as a dotted line on the plots below.
+
+
+```
+%matplotlib inline
+import matplotlib.pyplot as plt
+plt.rcParams['figure.figsize'] = [12, 8]
+
+
+def plot_dfs_as_bar(df_list, axhline=None):
+    if len(df_list) == 1:
+        df_list[0].plot(kind='bar', title=df_list[0].name, colormap='Spectral', rot=45)
+        return
+    ncol = 2
+    nrow = int((len(df_list)+1)/2)
+    fig, axs = plt.subplots(nrow,ncol)
+    fig.tight_layout(pad=4.0)
+    if len(df_list) % 2 != 0:
+        fig.delaxes(axs[nrow-1,1])
+    count=0
+    for r in range(nrow):
+        for c in range(ncol):
+            if count < len(df_list): # Handle odd length
+                if len(df_list) > 2:
+                    df_list[count].plot(kind='bar', ax=axs[r,c], title=df_list[count].name, colormap='Spectral', rot=45)
+                else:
+                    df_list[count].plot(kind='bar', ax=axs[c], title=df_list[count].name, colormap='Spectral', rot=45)
+                #axs[r,c].text(.5, .9, df_list[count].name, horizontalalignment='center', transform=axs[r,c].transAxes, bbox=dict(facecolor='red', alpha=0.5))
+                if axhline:
+                    axs[r,c].axhline(y=axhline, color='b', linestyle='dotted', lw=2)
+                count += 1
+```
+
+
+```
+# Create dataframe for ratio of positive cases per community class, for each community algorithm
+df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() / 
+               users_df[col].dropna().value_counts() 
+               for col in comm_cols]
+
+# Expected proportion of positive cases given independence:
+exp_pos_proportion = users_df['coded_as_witness'].value_counts()[1] / users_df.shape[0]
+
+plot_dfs_as_bar(df_list, ex_pos_proportion)
+```
+
+
+![png](harvey_user_location_data_prep_files/harvey_user_location_data_prep_45_0.png)
+
+
+From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
+
+The charts shown above suggest that the highest proportion of positive classes appear in the largest, or second-largest communities (as the labels have been ranked in order of size). This is significant -- a model cannot be trained on community label as a feature, as the labels are qualitative and will be different each time an algorithm runs on a network. Therefore these features cannot generalise to new datasets. The feature that is supplied must therefore be something which is generalisable; in this case, the ranking of the community by size my be appropriate (for example, a feature which represents whether a user is in the largest detected community). Alternatively, communities may exhibit different characteristics such as connectedness. This will be explored later.
+
+The next steps in the analyis of the validity of this approach is the calculate whether the disparities observed above are statistically significant. That is, whether these associations could have been observed by chance.
+
+Formally, for each community detection algorithm, we are testing the hypotheses:
+$$H_0: \text{There is no association between the community label and witness label}$$
+$$H_A: \text{There is an association between the community label and witness label}$$
+
+A chi-squre analysis is performed on the output of each detection algorithm with the target class. Note that communities with a size below 5 are removed as per the recommendation for chi-square analysis.
+
+
+```
+import scipy.stats as scs
+
+def chi_square_of_df_cols(df, col1, col2):
+    confusion_matrix = pd.crosstab(df[col2], df[col1])
+    # Remove rows where observed cases are too low -- TODO: should also check expected values are > 4
+    confusion_matrix = confusion_matrix.loc[(confusion_matrix[0] > 4) & (confusion_matrix[1] > 4)]
+    return scs.chi2_contingency(confusion_matrix)
+
+y_col = 'coded_as_witness'
+data = [[col] + list(chi_square_of_df_cols(users_df, y_col, col)[:2]) for col in comm_cols]
+
+chi2a_df = pd.DataFrame(data=data, columns=['feature', 'chi2', 'p-val'])
+#chi2a_df.plot(kind='bar', y='chi2', x='feature', rot=45)
+chi2a_df
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>feature</th>
+      <th>chi2</th>
+      <th>p-val</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>c_modularity</td>
+      <td>203.049783</td>
+      <td>6.322997e-42</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>c_label_prop</td>
+      <td>70.601393</td>
+      <td>4.667693e-16</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>c_label_prop_asyn</td>
+      <td>77.662807</td>
+      <td>9.733526e-17</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>c_fluid</td>
+      <td>159.080991</td>
+      <td>5.007112e-31</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>louvain</td>
+      <td>148.105619</td>
+      <td>2.176483e-27</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+For all features, the analysis produced a significant $\chi^2$ value, well beyond our $\alpha=0.05$. Therefore we can reject the null hypothesis and accept that the alternative: there is an association between community and witness status.
+
+In the following cells, a number of other measures of association are tested, including the `sklearn` implementation of chi-square.
+
+
+```
+from sklearn.feature_selection import chi2
+
+temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
+
+X = temp_df[comm_cols]
+y = temp_df['coded_as_witness']
+
+chi2b_df = pd.DataFrame(data={'feature': comm_cols, 'chi2': chi2(X,y)[0], 'p-val': chi2(X,y)[1]})
+#chi2b_df.plot(kind='bar', y='chi2', x='feature', rot=45)
+chi2b_df
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>feature</th>
+      <th>chi2</th>
+      <th>p-val</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>c_modularity</td>
+      <td>68.968622</td>
+      <td>1.000425e-16</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>c_label_prop</td>
+      <td>273.568258</td>
+      <td>1.893396e-61</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>c_label_prop_asyn</td>
+      <td>348.001552</td>
+      <td>1.154339e-77</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>c_fluid</td>
+      <td>35.292848</td>
+      <td>2.836718e-09</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>louvain</td>
+      <td>341.154576</td>
+      <td>3.576233e-76</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```
+def cramers_v(x, y):
+    confusion_matrix = pd.crosstab(x,y)
+    chi2 = scs.chi2_contingency(confusion_matrix)[0]
+    n = confusion_matrix.sum().sum()
+    phi2 = chi2/n
+    r,k = confusion_matrix.shape
+    phi2corr = max(0, phi2-((k-1)*(r-1))/(n-1))
+    rcorr = r-((r-1)**2)/(n-1)
+    kcorr = k-((k-1)**2)/(n-1)
+    return np.sqrt(phi2corr/min((kcorr-1),(rcorr-1)))
+
+# Drop na values from y col
+temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
+y = temp_df['coded_as_witness']
+
+data = [(col, cramers_v(temp_df[col],y)) for col in comm_cols]
+cramers_df = pd.DataFrame(data=data, columns=['feature', 'cramers_v'])
+#cramers_df.plot(kind='bar', x='feature', rot=45)
+cramers_df
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>feature</th>
+      <th>cramers_v</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>c_modularity</td>
+      <td>0.454272</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>c_label_prop</td>
+      <td>0.410480</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>c_label_prop_asyn</td>
+      <td>0.409678</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>c_fluid</td>
+      <td>0.412405</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>louvain</td>
+      <td>0.474526</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```
+import math
+from collections import Counter
+
+def conditional_entropy(x, y, log_base: float = math.e):
+    y_counter = Counter(y)
+    xy_counter = Counter(list(zip(x, y)))
+    total_occurrences = sum(y_counter.values())
+    entropy = 0.0
+    for xy in xy_counter.keys():
+        p_xy = xy_counter[xy] / total_occurrences
+        p_y = y_counter[xy[1]] / total_occurrences
+        entropy += p_xy * math.log(p_y / p_xy, log_base)
+    return entropy
+
+def theils_u(x, y):
+    s_xy = conditional_entropy(x,y)
+    x_counter = Counter(x)
+    total_occurrences = sum(x_counter.values())
+    p_x = list(map(lambda n: n/total_occurrences, x_counter.values()))
+    s_x = scs.entropy(p_x)
+    if s_x == 0:
+        return 1
+    else:
+        return (s_x - s_xy) / s_x
+    
+# Drop na values from y col
+temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
+y = temp_df['coded_as_witness']
+
+#data = [(col, theils_u(temp_df[col],y)) for col in community_cols]
+data = [(col, theils_u(y, temp_df[col])) for col in comm_cols]
+theils_df = pd.DataFrame(data=data, columns=['feature', 'thiels_u'])
+#theils_df.plot(kind='bar', x='feature', rot=45)
+theils_df
+
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>feature</th>
+      <th>thiels_u</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>c_modularity</td>
+      <td>0.180740</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>c_label_prop</td>
+      <td>0.149250</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>c_label_prop_asyn</td>
+      <td>0.152873</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>c_fluid</td>
+      <td>0.143139</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>louvain</td>
+      <td>0.209955</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```
+from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
+from sklearn.ensemble import RandomForestClassifier
+
+X = users_df[comm_cols]
+y = users_df['coded_as_witness']
+for col in comm_cols:
+    y = y.loc[~X[col].isna()]
+    X = X.loc[~X[col].isna()]
+
+##tree = DecisionTreeRegressor().fit(X, y)
+tree = DecisionTreeClassifier().fit(X, y)
+#tree = RandomForestClassifier().fit(X, y)
+
+rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_), 
+               columns =['feature', 'importance']) 
+
+#rf_df.plot(kind='bar', x='feature', rot=45)
+rf_df
+```
+
+
+
+
+<div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>feature</th>
+      <th>importance</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>c_modularity</td>
+      <td>0.178260</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>c_label_prop</td>
+      <td>0.036715</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>c_label_prop_asyn</td>
+      <td>0.058867</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>c_fluid</td>
+      <td>0.190152</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>louvain</td>
+      <td>0.536006</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```
+# #df_list = [chi2a_df, chi2b_df, cramers_df, theils_df, rf_df]
+
+# df_list = [chi2a_df['chi2']]
+# #plot_dfs_as_bar([chi2a_df['chi2'].index = chi2a_df['feature'].values])
+# #chi2a_df['chi2']
+# #x = chi2a_df['chi2'].copy()
+# chi2a_df['chi2'].index = chi2a_df['feature']
+# chi2a_df['chi2']
+# plot_dfs_as_bar([chi2a_df['chi2']])
+```
+
+
+```
+# # Combine DFs:
+
+# dfs = [rf_df,
+#         chi2_df.drop(['p-val'], axis=1),
+#         chi2b_df.drop(['p-val'], axis=1),
+#         cramers_df,
+#         theils_df
+#       ]
+
+# temp_df = dfs[0].copy()
+# for d in dfs[1:]:
+#     temp_df = pd.merge(left=temp_df, right=d, left_on='feature', right_on='feature', suffixes=('a', 'b'))
+
+# # normalise chi2 columns
+# temp_df['chi2a'] = temp_df['chi2a'] / temp_df['chi2a'].max()
+# temp_df['chi2b'] = temp_df['chi2b'] / temp_df['chi2b'].max()
+
+# temp_df.plot(kind='bar', x='feature', rot=45)  
+# temp_df
+```
+
+
+```
+
+```
