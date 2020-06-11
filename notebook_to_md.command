@@ -8,8 +8,8 @@ rsync -rPz --include="*.ipynb" --include="*/img/*.png" --exclude="/Notes/" --exc
 
 # Create Markdown copies of notebooks for Github viewing
 rm -rf ./notebooks/markdown/*
-cp -r ./notebooks/data ./notebooks/markdown/data
 jupyter nbconvert --output-dir='./notebooks/markdown' --to markdown notebooks/*.ipynb
+cp -r ./notebooks/data ./notebooks/markdown/data
 
 
 # Remove style tag contents from .md files as they do not render on Github:
