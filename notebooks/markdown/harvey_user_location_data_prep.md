@@ -2,10 +2,10 @@
 # User Location Classification in Hurricane Harvey
 The goal of this analysis is to evaluate methods by which users Tweeting about Hurricane Harvey may be classified as in the area or otherwise.
 
-Data was collected with custom software which observed several Twitter streams and enhanced this information by querying the Twitter REST APIs for the network data (friends and followers) of each author. Stream volume which exceeded the capacity of the REST requests was discarded.
+Data was collected with custom software which observed several Twitter streams and enhanced this information by querying the Twitter REST APIs for the network data (friends and followers) of each author. Stream volume which exceeded the capacity of the REST requests was discarded. 
 * The keyword stream monitored the terms: [#harvey, #harveystorm, #hurricaneharvey, #corpuschristi]
 * The GPS stream used the bounding box: [-99.9590682, 26.5486063, -93.9790001, 30.3893434]
-* The collection period ran from 2017-08-26 01:32:18 until 2017-09-02 10:30:52
+* The collection period ran from 2017-08-26 01:32:18 until 2017-09-02 10:30:52 
 * 55,605 Tweets by 33,585 unique authors were recorded
 
 Data was coded using an interface built into the collection software by a primary coder. A secondary coder coded a sub-set of coded users for validation of the coding schema. User instances were coded by whether they 'appeared to be in the affected area'.
@@ -37,19 +37,19 @@ for d in dimensions:
     print('Class Totals (primary / secondary): ')
     for code in d.datacode.all():
         print("\t {}: \t{} \t/ {}"
-                .format(code.name,
-                    account_codings.filter(data_code__id=code.id).count(),
+                .format(code.name, 
+                    account_codings.filter(data_code__id=code.id).count(), 
                     account_codings_secondary.filter(data_code__id=code.id).count())
              )
 print("{} Accounts coded by primary coder, {} by secondary coder.".format(account_codings.count(), account_codings_secondary.count()))
-if len(dimensions) > 1:
+if len(dimensions) > 1: 
     print('\tNote: Totals represent sum of all codes from {} dimensions.'.format(len(dimensions)))
     print('WARNING: Code in cells below assume one dimension -- adjust to constrain.')
 ```
 
     Coding Dimension:  Local
     Subject:  user
-    Class Totals (primary / secondary):
+    Class Totals (primary / secondary): 
     	 Unsure: 	31 	/ 5
     	 Non-Witness: 	1083 	/ 94
     	 Witness: 	386 	/ 52
@@ -62,7 +62,7 @@ We then create a dataframe of all users which have been coded by the primary cod
 ```
 # Get all Users coded by primary coder:
 # (exclude data_code_id=0 as this is the temporary 'to be coded' class)
-users = User.objects.filter(coding_for_user__coding_id=1,
+users = User.objects.filter(coding_for_user__coding_id=1, 
                             coding_for_user__data_code__data_code_id__gt=0)
 users_df = pd.DataFrame(list(users.values()))
 
@@ -133,7 +133,7 @@ There are a number of options which can represent the ground truth location of t
 * Location data derived from Tweet stream
     * GPS tagged Tweets
     * Mention of location in Tweet body
-
+    
 ### Parsing user-set location in profile field
 The location the user sets in their profile as a string is evaluated and a locality decision made. In this instance, a location is considered 'local' if its coordinates (supplied by the Google geolocation API or parsed directly from the location string) fall within the bounding box used for geographic Twitter data collection, or if it contains the string 'houston' or 'christi' (representing the town Corpus Christi). Both of these locations fall within the bounding box, and are used here as a time-saving operation.
 
@@ -160,7 +160,7 @@ Note that as this field can be set manually, it is unverifiable and therefore no
 
 #with open('data/harvey_user_location/local_profile_locations_manual_check.txt', 'r') as f:
 #    local_locations_list = f.read().splitlines()
-
+    
 ## Create column for users with local location listed in profile
 #users_df['local_profile_location_manual'] = \
 #    (users_df.location.str.contains('houston|christi', case=False, regex=True) |
@@ -212,7 +212,7 @@ def is_in_bounding_box(coords, boxes):
 
 def is_local(location, boxes, known_localities=[]):
     '''
-    Check whether a location string falls within a set of
+    Check whether a location string falls within a set of 
     bounding boxes using Googlemaps API.
     '''
     if not location:
@@ -559,7 +559,7 @@ def get_age_in_days(date_str, anchor_date):
         datetime_object = datetime.strptime(date_str, '%Y-%m-%d %H:%M:%S.%f%z')
     return abs((anchor_date - datetime_object).days)
 
-
+    
 # Get dates of event:
 e = Event.objects.all()[0]
 end = max(e.time_end, e.kw_stream_end, e.gps_stream_end)
@@ -573,7 +573,7 @@ users_df['account_age'] = users_df['created_at'].apply(get_age_in_days, args=(en
 users_df['day_of_detection'] = users_df['added_at'].apply(get_age_in_days, args=(start,))
 ```
 
-An error in data collection allowed some `in_degree` and `out_degree` values to become negative. These are adjusted to 0.
+An error in data collection allowed some `in_degree` and `out_degree` values to become negative. These are adjusted to 0. 
 
 Note: It is possible that other entries have values one lower than what they should be.
 
@@ -622,11 +622,11 @@ for col in users_df.columns:
 ```
 
     data_source
-    [1 3]
-
+    [1 3] 
+    
     day_of_detection
-    [3 5 1 2 6 4 7 8]
-
+    [3 5 1 2 6 4 7 8] 
+    
 
 
 `day_of_detection` is an ordinal feature and is therefore untouched.
@@ -648,15 +648,15 @@ True/False columns are converted to 1/0 values for model compatibility
 # Convert True/False columns to 1/0
 print('Converting columns from boolean to binary:\n')
 for col in users_df.columns:
-    if (len(users_df[col].value_counts()) == 2 and
-            True in users_df[col].values and
+    if (len(users_df[col].value_counts()) == 2 and 
+            True in users_df[col].values and 
             False in users_df[col].values):
         print(col)
         users_df[col] = users_df[col].astype(int)
 ```
 
     Converting columns from boolean to binary:
-
+    
     default_profile
     default_profile_image
     geo_enabled
@@ -720,7 +720,7 @@ In the following section, the original dataframe is enhanced with modularity met
 
 Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were performed in a separate script for the sake of testing and will ideally be calculated by the data collection software at the end of the collection process in future iterations.
 
-The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges.
+The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges. 
 
 As most algorithms require an undirected graph, the direction of relationships was ignored.
 
@@ -763,19 +763,6 @@ df_comm.head()
 
 
 <div>
-<style scoped>
-  .dataframe tbody tr th:only-of-type {
-      vertical-align: middle;
-  }
-
-  .dataframe tbody tr th {
-      vertical-align: top;
-  }
-
-  .dataframe thead th {
-      text-align: right;
-  }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -849,19 +836,6 @@ users_df.head()
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1070,8 +1044,8 @@ def plot_dfs_as_bar(df_list, axhline=None):
 
 ```
 # Create dataframe for ratio of positive cases per community class, for each community algorithm
-df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() /
-               users_df[col].dropna().value_counts()
+df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() / 
+               users_df[col].dropna().value_counts() 
                for col in comm_cols]
 
 # Expected proportion of positive cases given independence:
@@ -1118,19 +1092,6 @@ chi2a_df
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1201,19 +1162,6 @@ chi2b_df
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1287,19 +1235,6 @@ cramers_df
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1366,7 +1301,7 @@ def theils_u(x, y):
         return 1
     else:
         return (s_x - s_xy) / s_x
-
+    
 # Drop na values from y col
 temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
 y = temp_df['coded_as_witness']
@@ -1383,19 +1318,6 @@ theils_df
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -1451,8 +1373,8 @@ for col in comm_cols:
 #tree = DecisionTreeClassifier().fit(X, y)
 tree = RandomForestClassifier().fit(X, y)
 
-rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_),
-               columns =['feature', 'importance'])
+rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_), 
+               columns =['feature', 'importance']) 
 
 #rf_df.plot(kind='bar', x='feature', rot=45)
 rf_df
@@ -1466,19 +1388,6 @@ rf_df
 
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
