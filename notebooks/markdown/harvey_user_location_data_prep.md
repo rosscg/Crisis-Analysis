@@ -764,17 +764,17 @@ df_comm.head()
 
 <div>
 <style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
+  .dataframe tbody tr th:only-of-type {
+      vertical-align: middle;
+  }
 
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
+  .dataframe tbody tr th {
+      vertical-align: top;
+  }
 
-    .dataframe thead th {
-        text-align: right;
-    }
+  .dataframe thead th {
+      text-align: right;
+  }
 </style>
 <table border="1" class="dataframe">
   <thead>
@@ -1285,7 +1285,7 @@ cramers_df
 
 
 
-```{=html}
+
 <div>
 <style scoped>
     .dataframe tbody tr th:only-of-type {
@@ -1337,7 +1337,6 @@ cramers_df
   </tbody>
 </table>
 </div>
-```
 
 
 
