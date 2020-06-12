@@ -10,12 +10,14 @@ Data was collected with custom software which observed several Twitter streams a
 
 Data was coded using an interface built into the collection software by a primary coder. A secondary coder coded a sub-set of coded users for validation of the coding schema. User instances were coded by whether they 'appeared to be in the affected area'.
 
+These notebooks access the data directly from the database using standard Django query syntax.
+
 
 # Data Cleaning & Enrichment
 First we get all the coding instances made by the primary and secondary coders, and check the total codings of each class. There may be multiple coding dimensions (sets of coding schema), in which case the code requires adjustment to constrain to one.
 
 
-```
+```python
 import pandas as pd
 
 # Get coding instances of user objects:
@@ -59,7 +61,7 @@ if len(dimensions) > 1:
 We then create a dataframe of all users which have been coded by the primary coder to create the initial dataset. The subjects of the secondary coder are a subset of this set by design.
 
 
-```
+```python
 # Get all Users coded by primary coder:
 # (exclude data_code_id=0 as this is the temporary 'to be coded' class)
 users = User.objects.filter(coding_for_user__coding_id=1, 
@@ -103,7 +105,7 @@ users_df.count()[users_df.count() != account_codings.count()].sort_values(ascend
 * Various 0 value fields had been added to the database schema but were not implemented at the time of collection. These can be safely dropped.
 
 
-```
+```python
 # Dropping empty columns
 empty_cols = users_df.columns[users_df.isnull().all()]
 users_df.drop(empty_cols, axis=1, inplace=True)
@@ -112,7 +114,7 @@ users_df.drop(empty_cols, axis=1, inplace=True)
 We can also drop columns which have a single value, as they provide no differentiation:
 
 
-```
+```python
 # Drop columns with only one unique value:
 for col in users_df.columns:
     if len(users_df[col].value_counts()) <= 1:
@@ -140,7 +142,7 @@ The location the user sets in their profile as a string is evaluated and a local
 Note that as this field can be set manually, it is unverifiable and therefore not a perfect representation of location, even where it exists. Users may neglect to update their location after moving, and some observations were made of users setting their location to that of a disaster event as a 'show of solidarity'.
 
 
-```
+```python
 ## This block supports manual coding of locations as local or non-local.
 ## It has been superceded by the next block which uses the Googlemaps API
 
@@ -168,7 +170,7 @@ Note that as this field can be set manually, it is unverifiable and therefore no
 ```
 
 
-```
+```python
 import re
 
 def parse_coordinates(string):
@@ -194,7 +196,7 @@ def parse_coordinates(string):
 ```
 
 
-```
+```python
 import yaml
 import googlemaps
 
@@ -246,7 +248,7 @@ def is_local(location, boxes, known_localities=[]):
 ```
 
 
-```
+```python
 # Bounding boxes used for Hurricane Harvey dataset:
 boxes = [[(29.1197,-99.9590682),(26.5486063,-97.5021)],
         [(30.3893434,-97.5021),(26.5486063,-93.9790001)]]
@@ -275,7 +277,7 @@ with open('data/harvey_user_location/location_list_from_api_non_local.txt', 'w')
 ```
 
 
-```
+```python
 # Use cached locations instead of querying API:
 #users_df["location"] = users_df["location"].str.lower().str.strip()
 #local_location_list_cached = []
@@ -290,7 +292,7 @@ Timezone data provided by Twitter when capturing the user objects is less specif
 As this data field has been deprecated by Twitter, it will not be available in new data sets.
 
 
-```
+```python
 # View most prevalent time zones:
 print(users_df['time_zone'].value_counts().head())
 
@@ -314,7 +316,7 @@ Accounts were manually coded as 'local' or 'non-local'.
 Coders were shown the user account details as well as the Twitter stream of the user. The coders were instructed to determine whether the user account was in an area affected by the hurricane at any point during the data collection period. Therefore, the term 'local' may be misleading to the reader, as the definition given to the coders will include anyone visiting the area as, for example, a responder or aid worker. This larger set of 'on the ground' users is a more useful target for classification.
 
 
-```
+```python
 # Create column to represent manual coding:
 users_df['coded_as'] = \
     users_df['screen_name'].apply(lambda x: account_codings.get(user__screen_name = x).data_code.name)
@@ -334,7 +336,7 @@ The 'Unsure' code is represented as `False` values in both the `coded_as_witness
 While the Tweets detected by the system may not contain GPS data, the author may have made other GPS-enabled Tweets during the collection period from which we can infer location. We create a column representing whether the user made any geolocated Tweets within the bounding box during the collection period.
 
 
-```
+```python
 # Check whether any of a user's Tweets fall within the bounding box and update column:
 # This will take several minutes to run
 
@@ -515,7 +517,7 @@ for i in range(len(users)):
 The dataframe is exported to a csv file before further manipulation (and column dropping) to avoid repeating the expensive tasks above.
 
 
-```
+```python
 import pandas as pd
 path = 'data/harvey_user_location/df_users_temp.csv'
 
@@ -525,7 +527,7 @@ users_df.to_csv(path)
 ```
 
 
-```
+```python
 # Re-import and check rows match:
 orig_shape = users_df.shape
 users_df_temp = pd.read_csv(path, index_col=0)
@@ -542,7 +544,7 @@ New features are synthesised from existing data.
 Columns are added which represent the age of the user account (at the time of original collection) and at which point during the event the account was first detected by the stream.
 
 
-```
+```python
 # Create columns to represent age of account at time of detection, and how soon
 # after the beginning of the event that the account was first detected.
 
@@ -578,7 +580,7 @@ An error in data collection allowed some `in_degree` and `out_degree` values to 
 Note: It is possible that other entries have values one lower than what they should be.
 
 
-```
+```python
 # Fix negative values in in_degree and out_degree: an error from data collection:
 users_df.loc[users_df['in_degree'] < 0, 'in_degree'] = 0
 users_df.loc[users_df['out_degree'] < 0, 'out_degree'] = 0
@@ -588,7 +590,7 @@ users_df.loc[users_df['out_degree'] < 0, 'out_degree'] = 0
 Qualitative columns are converted into formats interpretable by a model.
 
 
-```
+```python
 # Create column to represent length of profile description:
 users_df['description_length'] = users_df.description.str.len()
 #users_df = users_df.drop(['description_length'], axis=1)
@@ -611,7 +613,7 @@ users_df['changed_screen_name'] = users_df['old_screen_name'].notnull()
 We check for columns which should be represented categorically by counting the unique values in each column (under the assumption that categorical variables will have fewer than 20 unique values):
 
 
-```
+```python
 # Check columns for categorical candidates:
 for col in users_df.columns:
     if len(users_df[col].value_counts()) <= 20:
@@ -634,7 +636,7 @@ for col in users_df.columns:
 `data_source` is a categorical feature, so we re-encode it as a binary value. Here, the values of 1 and 3 are arbitrary (the 2 value was not implemented in the collection process).
 
 
-```
+```python
 # Encoding categorical columns as one-hot:
 # data_source==1 is not encoded as we only need n-1 columns to represent n categories.
 users_df['is_data_source_3'] = users_df['data_source'] == 3.
@@ -644,7 +646,7 @@ users_df = users_df.drop(['data_source'], axis=1)
 True/False columns are converted to 1/0 values for model compatibility
 
 
-```
+```python
 # Convert True/False columns to 1/0
 print('Converting columns from boolean to binary:\n')
 for col in users_df.columns:
@@ -678,7 +680,7 @@ for col in users_df.columns:
 ## Export to File
 
 
-```
+```python
 import pandas as pd
 
 path = 'data/harvey_user_location/df_users.csv'
@@ -727,7 +729,217 @@ As most algorithms require an undirected graph, the direction of relationships w
 Communities are labelled as numbers according to their ranking in size (where 0 is the largest), thus the labels have some level of ordinality.
 
 
+```python
+import networkx as nx
+
+def get_graph_object():
+    EVENT_NAME = Event.objects.all()[0].name.replace(' ', '')
+    FILENAME = 'network_data_{}_v1.gexf'.format(EVENT_NAME)
+    DIR = './data/harvey_user_location/'
+    try:
+        # Load cached file if available
+        G = nx.read_gexf(DIR + FILENAME)
+        print('Importing existing graph object...')
+    except:
+        print('Creating new graph object...')
+        classed_users = User.objects.filter(user_class__gte=1)
+        edges = Relo.objects.filter(target_user__in=classed_users, source_user__in=classed_users, end_observed_at=None)
+        G=nx.DiGraph()
+        for node in classed_users:
+            try:
+                user_code = node.coding_for_user.filter(coding_id=1).exclude(data_code__name='To Be Coded')[0].data_code.name
+            except:
+                user_code = ''
+            G.add_node(node.screen_name, user_class=node.user_class, user_code=user_code)
+        edge_list = [(edge.source_user.screen_name, edge.target_user.screen_name) for edge in edges]
+        G.add_edges_from(edge_list)
+        #for relo in relevant_relos:
+        #    G.add_edge(relo.source_user.screen_name, relo.target_user.screen_name)
+        nx.write_gexf(G, DIR + FILENAME, prettyprint=True)
+        G = nx.read_gexf(DIR + FILENAME)
+    return G
 ```
+
+
+```python
+# Modularity:   https://scholar.google.com/scholar?q=Finding+community+structure+in+very+large+networks
+# Label Prop:   https://neo4j.com/docs/graph-algorithms/current/algorithms/label-propagation/#algorithms-label-propagation-sample
+# Louvain:      https://github.com/taynaud/python-louvain/blob/master/docs/index.rst
+
+import networkx as nx
+from networkx.algorithms.community import greedy_modularity_communities, label_propagation_communities, asyn_lpa_communities, asyn_fluidc, girvan_newman
+import community as community_louvain
+from collections import Counter
+
+def calc_community_metrics(G=None):
+    EVENT_NAME = Event.objects.all()[0].name.replace(' ', '')
+    DIR = './data/harvey_user_location/'
+    FILENAME_COMM = 'network_data_{}_v2.gexf'.format(EVENT_NAME)
+    
+    FLIUD_COMMUNITIES_NUMBER = 8
+    RETURN_GIANT_COMPONENT = True # Only save giant component to graph objects
+
+    try:
+        # Load cached file if available
+        G = nx.read_gexf(DIR + FILENAME_COMM)
+        print('Importing existing community graph object...')
+    except:
+        print('Calculating community metrics...')
+        if not G:
+            G = get_graph_object()
+        print('Original graph has {} nodes and {} edges.'.format(len(G), G.number_of_edges()))
+        
+        # Create undirected graph (required for community detection):
+        H = nx.Graph(G)
+
+        # Get largest component
+        Hcc = max(nx.connected_components(H), key=len)
+        H0 = H.subgraph(Hcc)
+        print('Largest component has {} nodes and {} edges.'.format(len(H0), H0.number_of_edges()))
+
+        # Discard other components:
+        if RETURN_GIANT_COMPONENT:
+            G = G.subgraph(Hcc)
+
+        # Get communities
+        print('Calculating c_modularity...')
+        c_modularity = list(greedy_modularity_communities(H0))
+        print('Calculating c_label_prop...')
+        c_label_prop = list(label_propagation_communities(H0))
+        c_label_prop = sorted(c_label_prop, key=len, reverse=True)
+        print('Calculating c_label_prop_asyn...')
+        c_label_prop_asyn = list(asyn_lpa_communities(H0))
+        c_label_prop_asyn = sorted(c_label_prop_asyn, key=len, reverse=True)
+        print('Calculating c_fluid...')
+        c_fluid = list(asyn_fluidc(H0, FLIUD_COMMUNITIES_NUMBER))
+        c_fluid = sorted(c_fluid, key=len, reverse=True)
+        # TOO SLOW:
+        # print('Calculating c_girvan_newman...')
+        # c_girvan_newman = list(girvan_newman(H0))
+
+        community_output_dict = {'c_modularity': c_modularity,
+                                    'c_label_prop': c_label_prop,
+                                    'c_label_prop_asyn': c_label_prop_asyn,
+                                    'c_fluid': c_fluid,
+                                    # 'c_girvan_newman': c_girvan_newman
+                                    }
+
+        print('Adding data as node attributes...')
+        # Add communities to node attributes:
+        for key in community_output_dict:
+            community_dict = {}
+            for i, c in enumerate(community_output_dict[key]):
+                for name in c:
+                    community_dict[name] = i
+            nx.set_node_attributes(G, community_dict, key)
+
+        # Repeat for louvain algorithm.
+        print('Calculating c_louvain...')
+        partition = community_louvain.best_partition(H0)
+        # Reset community indices by size
+        counter = Counter(partition.values())
+        ranking = sorted(counter, key=counter.get, reverse=True)
+        partition_sorted = {k: ranking.index(v) for k, v in partition.items()}
+        # Add to node attribute
+        print('Adding data to node attribute...')
+        nx.set_node_attributes(G, partition_sorted, 'c_louvain')
+
+        print('Writing to file...')
+        nx.write_gexf(G, DIR + FILENAME_COMM, prettyprint=True)
+        
+    return G
+```
+
+
+```python
+import pandas as pd
+
+G = calc_community_metrics()
+nodes = G.nodes(data=True)
+df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
+df_comm = df_comm.drop(['user_class', 'user_code', 'label'], axis=1)
+#df_comm = df_comm.reset_index(drop=True)
+df_comm.head()
+```
+
+    Calculating community metrics...
+    Importing existing graph object...
+    Original graph has 31931 nodes and 101096 edges.
+    Largest component has 18409 nodes and 76341 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Adding data as node attributes...
+    Calculating c_louvain...
+    Adding data to node attribute...
+    Writing to file...
+
+
+
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>c_modularity</th>
+      <th>c_label_prop</th>
+      <th>c_label_prop_asyn</th>
+      <th>c_fluid</th>
+      <th>c_louvain</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0044Tamil</th>
+      <td>2</td>
+      <td>4</td>
+      <td>785</td>
+      <td>1</td>
+      <td>7</td>
+    </tr>
+    <tr>
+      <th>007rogerbmoore</th>
+      <td>3</td>
+      <td>0</td>
+      <td>854</td>
+      <td>7</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>01fmoreira</th>
+      <td>3</td>
+      <td>0</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1</td>
+    </tr>
+    <tr>
+      <th>0KTOBR</th>
+      <td>5</td>
+      <td>2</td>
+      <td>1</td>
+      <td>4</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>0x41_0x48</th>
+      <td>241</td>
+      <td>885</td>
+      <td>1083</td>
+      <td>2</td>
+      <td>0</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
+
+
+```python
 # Open original Dataframe
 import pandas as pd
 
@@ -745,84 +957,12 @@ users_df.shape
 
 
 
-```
-# Open graph and convert to dataframe
-import networkx as nx
-
-path = '../gephi_network_data_harvey_community_v2.gexf'
-G = nx.read_gexf(path)
-nodes = G.nodes(data=True)
-
-df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
-df_comm = df_comm.drop(['user_class', 'user_code', 'label'], axis=1)
-#df_comm = df_comm.reset_index(drop=True)
-df_comm.head()
-```
-
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>c_modularity</th>
-      <th>c_label_prop</th>
-      <th>c_label_prop_asyn</th>
-      <th>c_fluid</th>
-      <th>louvain</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0044Tamil</th>
-      <td>2</td>
-      <td>4</td>
-      <td>803</td>
-      <td>7</td>
-      <td>7</td>
-    </tr>
-    <tr>
-      <th>007rogerbmoore</th>
-      <td>5</td>
-      <td>0</td>
-      <td>161</td>
-      <td>2</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>01fmoreira</th>
-      <td>3</td>
-      <td>0</td>
-      <td>1</td>
-      <td>3</td>
-      <td>4</td>
-    </tr>
-    <tr>
-      <th>0KTOBR</th>
-      <td>5</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-    </tr>
-    <tr>
-      <th>0x41_0x48</th>
-      <td>233</td>
-      <td>854</td>
-      <td>1075</td>
-      <td>4</td>
-      <td>0</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
+```python
 
 ```
+
+
+```python
 # Create list of community algorithm column names
 comm_cols = list(df_comm.columns)
 
@@ -851,16 +991,16 @@ users_df.head()
       <th>eigenvector_centrality</th>
       <th>favourites_count</th>
       <th>...</th>
-      <th>c_modularity_y</th>
-      <th>c_label_prop_y</th>
-      <th>c_label_prop_asyn_y</th>
-      <th>c_fluid_y</th>
-      <th>louvain_y</th>
+      <th>has_url</th>
+      <th>changed_screen_name</th>
+      <th>account_age</th>
+      <th>day_of_detection</th>
+      <th>is_data_source_3</th>
       <th>c_modularity</th>
       <th>c_label_prop</th>
       <th>c_label_prop_asyn</th>
       <th>c_fluid</th>
-      <th>louvain</th>
+      <th>c_louvain</th>
     </tr>
   </thead>
   <tbody>
@@ -877,16 +1017,16 @@ users_df.head()
       <td>3.905631e-07</td>
       <td>2030</td>
       <td>...</td>
+      <td>0</td>
+      <td>0</td>
+      <td>1645</td>
+      <td>3</td>
+      <td>0</td>
       <td>3.0</td>
       <td>0.0</td>
       <td>4.0</td>
-      <td>2.0</td>
-      <td>1.0</td>
-      <td>3.0</td>
-      <td>0.0</td>
       <td>4.0</td>
-      <td>2.0</td>
-      <td>1.0</td>
+      <td>6.0</td>
     </tr>
     <tr>
       <th>1</th>
@@ -901,16 +1041,16 @@ users_df.head()
       <td>1.785776e-07</td>
       <td>1015</td>
       <td>...</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1321</td>
+      <td>5</td>
+      <td>0</td>
       <td>5.0</td>
       <td>0.0</td>
-      <td>779.0</td>
-      <td>6.0</td>
-      <td>6.0</td>
-      <td>5.0</td>
-      <td>0.0</td>
-      <td>779.0</td>
-      <td>6.0</td>
-      <td>6.0</td>
+      <td>1750.0</td>
+      <td>3.0</td>
+      <td>4.0</td>
     </tr>
     <tr>
       <th>2</th>
@@ -925,16 +1065,16 @@ users_df.head()
       <td>8.518251e-14</td>
       <td>12</td>
       <td>...</td>
+      <td>1</td>
+      <td>0</td>
+      <td>1865</td>
+      <td>1</td>
+      <td>1</td>
       <td>4.0</td>
-      <td>655.0</td>
-      <td>1336.0</td>
-      <td>0.0</td>
-      <td>15.0</td>
+      <td>697.0</td>
+      <td>767.0</td>
+      <td>6.0</td>
       <td>4.0</td>
-      <td>655.0</td>
-      <td>1336.0</td>
-      <td>0.0</td>
-      <td>15.0</td>
     </tr>
     <tr>
       <th>3</th>
@@ -949,16 +1089,16 @@ users_df.head()
       <td>4.315565e-05</td>
       <td>347</td>
       <td>...</td>
+      <td>1</td>
+      <td>0</td>
+      <td>2451</td>
+      <td>1</td>
+      <td>0</td>
       <td>2.0</td>
       <td>0.0</td>
-      <td>1.0</td>
-      <td>7.0</td>
-      <td>4.0</td>
-      <td>2.0</td>
       <td>0.0</td>
+      <td>3.0</td>
       <td>1.0</td>
-      <td>7.0</td>
-      <td>4.0</td>
     </tr>
     <tr>
       <th>4</th>
@@ -973,11 +1113,11 @@ users_df.head()
       <td>NaN</td>
       <td>25</td>
       <td>...</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>0</td>
+      <td>0</td>
+      <td>3052</td>
+      <td>1</td>
+      <td>0</td>
       <td>NaN</td>
       <td>NaN</td>
       <td>NaN</td>
@@ -986,7 +1126,7 @@ users_df.head()
     </tr>
   </tbody>
 </table>
-<p>5 rows × 70 columns</p>
+<p>5 rows × 50 columns</p>
 </div>
 
 
@@ -996,7 +1136,7 @@ As chi-square tests are typically recommended to require contingency tables with
 TODO: This only elimanates cells where the observed value is less than 5, this rule should also be applied to expected value cells.
 
 
-```
+```python
 # Ignore small communities where observed cases are too low (required for chi-square tests)
 MIN_COMMUNITY_SIZE = 5
 
@@ -1011,7 +1151,7 @@ $$\frac{386}{1500} = 0.257$$
 This is shown as a dotted line on the plots below.
 
 
-```
+```python
 %matplotlib inline
 import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [12, 8]
@@ -1042,7 +1182,7 @@ def plot_dfs_as_bar(df_list, axhline=None):
 ```
 
 
-```
+```python
 # Create dataframe for ratio of positive cases per community class, for each community algorithm
 df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() / 
                users_df[col].dropna().value_counts() 
@@ -1051,11 +1191,11 @@ df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_cou
 # Expected proportion of positive cases given independence:
 exp_pos_proportion = users_df['coded_as_witness'].value_counts()[1] / users_df.shape[0]
 
-plot_dfs_as_bar(df_list, ex_pos_proportion)
+plot_dfs_as_bar(df_list, exp_pos_proportion)
 ```
 
 
-![png](harvey_user_location_data_prep_files/harvey_user_location_data_prep_45_0.png)
+![png](harvey_user_location_data_prep_files/harvey_user_location_data_prep_48_0.png)
 
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
@@ -1071,7 +1211,7 @@ $$H_A: \text{There is an association between the community label and witness lab
 A chi-squre analysis is performed on the output of each detection algorithm with the target class. Note that communities with a size below 5 are removed as per the recommendation for chi-square analysis.
 
 
-```
+```python
 import scipy.stats as scs
 
 def chi_square_of_df_cols(df, col1, col2):
@@ -1105,32 +1245,32 @@ chi2a_df
     <tr>
       <th>0</th>
       <td>c_modularity</td>
-      <td>203.049783</td>
-      <td>6.322997e-42</td>
+      <td>204.309918</td>
+      <td>2.294331e-41</td>
     </tr>
     <tr>
       <th>1</th>
       <td>c_label_prop</td>
-      <td>70.601393</td>
-      <td>4.667693e-16</td>
+      <td>76.213552</td>
+      <td>2.821223e-17</td>
     </tr>
     <tr>
       <th>2</th>
       <td>c_label_prop_asyn</td>
-      <td>77.662807</td>
-      <td>9.733526e-17</td>
+      <td>125.941074</td>
+      <td>4.489969e-28</td>
     </tr>
     <tr>
       <th>3</th>
       <td>c_fluid</td>
-      <td>159.080991</td>
-      <td>5.007112e-31</td>
+      <td>91.635465</td>
+      <td>5.707362e-17</td>
     </tr>
     <tr>
       <th>4</th>
-      <td>louvain</td>
-      <td>148.105619</td>
-      <td>2.176483e-27</td>
+      <td>c_louvain</td>
+      <td>192.251301</td>
+      <td>1.391196e-36</td>
     </tr>
   </tbody>
 </table>
@@ -1145,7 +1285,7 @@ In the following cells, a number of other measures of association are tested, in
 We are now interested in selecting the community algorithm which is most useful in class prediction.
 
 
-```
+```python
 from sklearn.feature_selection import chi2
 
 temp_df = users_df[comm_cols + ['coded_as_witness']].dropna()
@@ -1159,57 +1299,7 @@ chi2b_df
 ```
 
 
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>feature</th>
-      <th>chi-square-b</th>
-      <th>p-val</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>c_modularity</td>
-      <td>68.968622</td>
-      <td>1.000425e-16</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>c_label_prop</td>
-      <td>273.568258</td>
-      <td>1.893396e-61</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>c_label_prop_asyn</td>
-      <td>348.001552</td>
-      <td>1.154339e-77</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c_fluid</td>
-      <td>35.292848</td>
-      <td>2.836718e-09</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>louvain</td>
-      <td>341.154576</td>
-      <td>3.576233e-76</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```
+```python
 def cramers_v(x, y):
     confusion_matrix = pd.crosstab(x,y)
     chi2 = scs.chi2_contingency(confusion_matrix)[0]
@@ -1232,51 +1322,7 @@ cramers_df
 ```
 
 
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>feature</th>
-      <th>cramers_v</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>c_modularity</td>
-      <td>0.454272</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>c_label_prop</td>
-      <td>0.410480</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>c_label_prop_asyn</td>
-      <td>0.409678</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c_fluid</td>
-      <td>0.412405</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>louvain</td>
-      <td>0.474526</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```
+```python
 import math
 from collections import Counter
 
@@ -1315,51 +1361,7 @@ theils_df
 ```
 
 
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>feature</th>
-      <th>thiels_u</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>c_modularity</td>
-      <td>0.180740</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>c_label_prop</td>
-      <td>0.149250</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>c_label_prop_asyn</td>
-      <td>0.152873</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c_fluid</td>
-      <td>0.143139</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>louvain</td>
-      <td>0.209955</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```
+```python
 from sklearn.tree import DecisionTreeRegressor, DecisionTreeClassifier
 from sklearn.ensemble import RandomForestClassifier
 
@@ -1380,56 +1382,8 @@ rf_df = pd.DataFrame(zip(comm_cols, tree.feature_importances_),
 rf_df
 ```
 
-    /home/rosles/projects/crisis-data/venv/lib/python3.6/site-packages/sklearn/ensemble/forest.py:245: FutureWarning: The default value of n_estimators will change from 10 in version 0.20 to 100 in 0.22.
-      "10 in version 0.20 to 100 in 0.22.", FutureWarning)
 
-
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>feature</th>
-      <th>importance</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>c_modularity</td>
-      <td>0.245265</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>c_label_prop</td>
-      <td>0.092487</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>c_label_prop_asyn</td>
-      <td>0.147841</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>c_fluid</td>
-      <td>0.228331</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>louvain</td>
-      <td>0.286075</td>
-    </tr>
-  </tbody>
-</table>
-</div>
-
-
-
-
-```
+```python
 df_list = [chi2a_df, chi2b_df, cramers_df, theils_df, rf_df]
 indices = chi2a_df['feature'].values
 df_list = [x.set_index('feature').iloc[:,0] for x in df_list]
@@ -1438,20 +1392,6 @@ plot_dfs_as_bar(df_list)
 ```
 
 
-![png](harvey_user_location_data_prep_files/harvey_user_location_data_prep_53_0.png)
-
-
-
-```
-
-```
-
-
-```
-
-```
-
-
-```
+```python
 
 ```
