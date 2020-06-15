@@ -3,7 +3,7 @@
 cd "${BASH_SOURCE%/*}"
 
 # Copy all notebooks, and png files in an img folders.
-rsync -rPz --include="*.ipynb" --include="*/img/*.png" --exclude="/Notes/" --exclude="*.*" --delete-excluded rosles@gales.cs.ox.ac.uk:projects/crisis-data/notebooks/ notebooks/
+rsync -rPz --include="*.ipynb" --include="*/img/*.png" --exclude="/notes/" --exclude="*.*" --delete-excluded rosles@gales.cs.ox.ac.uk:projects/crisis-data/notebooks/ notebooks/
 
 
 # Create Markdown copies of notebooks for Github viewing
