@@ -14,8 +14,6 @@ Data was coded using an interface built into the collection software by a primar
 These notebooks access the data directly from the database using standard Django query syntax.
 
 
-TODO: Check order of X,y in Thiels formula
-
 # Testing Community Detection Data
 
 This section investigates the value of social network data in classifying users by the target class (witness/non-witness). The hypothesis, loosely, is that local (or witness) users are more likely to follow one another, and therefore the reflection of this behaviour within the network structure provides a metric which can be implemented within classification models. Collecting this network data is significantly more difficult than the other User and Tweet features, therefore the associative qualities are rarely tested.
@@ -34,10 +32,10 @@ The following image shows the output of a community detection algorithm which ha
 
 <img src="./data/harvey_user_location/img/harvey-network-structure-community.png" alt="network-structure-community" style="width: 600px;"/>
 
-## Evaluating Community Algorithms
+## Calculating Community Labels
 In the following section, the original dataframe is enhanced with modularity metrics. These are features which are calculated based upon the graph structure of the user friend/follower network. There are a number of community detection algorithms, so a set of these have been calculated to be tested and compared for association to the target (witness) class.
 
-Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were performed in a separate script for the sake of testing and will ideally be calculated by the data collection software at the end of the collection process in future iterations.
+Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were chosen due to their common use for these applications as well as the availability of their implmentations within the package.
 
 The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges. 
 
@@ -136,6 +134,7 @@ def calc_community_metrics(G, filename=False):
     # Get largest component
     Hcc = max(nx.connected_components(H), key=len)
     H0 = H.subgraph(Hcc)
+    #H0 = nx.connected_component_subgraphs(H)[0]
     print('Largest component has {} nodes and {} edges.'
               .format(len(H0), H0.number_of_edges()))
 
@@ -294,8 +293,6 @@ comm_cols = list(df_comm.columns)
 
 # Merge dataframes
 users_df = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
-X = users_df[comm_cols]
-y = users_df['coded_as_witness']
 
 users_df.head()
 ```
@@ -459,12 +456,16 @@ users_df.head()
 
 
 
+## Evaluating Community Metrics
+
 Some algorithms create many small communities of 1-10 members, which will not be useful in generalisation of the model. Therefore discarding these is useful.
 
 Chi-square tests are typically recommended to require contingency tables with values of at least 5, which is addressed (in part) by this step. Note that this does not elimnate all relevant cells in the confusion matrix -- e.g. a row with 5 positive and 0 negative should be excluded from chi-square statistics as the negative cell has a frequency <5. This is therefore properly sorted below.
 
 
 ```python
+import numpy as np
+    
 # Ignore small communities where observed cases are too low (required for chi-square tests)
 MIN_COMMUNITY_SIZE = 10
 
@@ -472,6 +473,12 @@ for col in comm_cols:
     s = users_df[col].value_counts()
     #s = users_df.loc[users_df['coded_as_witness']==1, col].value_counts()
     users_df.loc[~users_df[col].isin(s.index[s >= MIN_COMMUNITY_SIZE]), col] = np.NaN
+```
+
+
+```python
+X = users_df[comm_cols]
+y = users_df['coded_as_witness']
 ```
 
 As a preliminary visual investigation into the relationship between community and code, we can check the proportion of nodes within a community that are coded as positive cases (witnesses). In an independent case, we would expect these ratios to be similar, and reflect the overall ratio of cases, which is:
@@ -485,7 +492,7 @@ import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [6, 4]
 
 
-def plot_dfs_as_bar(df_list, titles=None, axhline=None):
+def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
     '''
     Plots a list of dataframes or series as bar charts in a 
     single figure with two columns.
@@ -501,7 +508,7 @@ def plot_dfs_as_bar(df_list, titles=None, axhline=None):
     
     # Plot single chart without grid
     if len(df_list) == 1:
-        df_list[0].plot(kind='bar', colormap='Spectral', rot=45)
+        df_list[0].plot(kind=kind, colormap='Spectral', rot=45)
         if titles:
             ax.set_title(titles[0])
         return
@@ -528,7 +535,7 @@ def plot_dfs_as_bar(df_list, titles=None, axhline=None):
                 ax = axs[c]
             else:
                 ax = axs[r,c]
-            df_list[count].plot(kind='bar', ax=ax, colormap='Spectral', rot=45)
+            df_list[count].plot(kind=kind, ax=ax, colormap='Spectral', rot=45)
             if titles:
                 #ax.set_title(titles[count])
                 ax.text(.5, .9, titles[count], 
@@ -554,11 +561,23 @@ df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_cou
 # Calculate expected proportion of positive cases given independence:
 exp_pos_proportion = users_df['coded_as_witness'].value_counts()[1] / users_df.shape[0]
 
-plot_dfs_as_bar(df_list, axhline=exp_pos_proportion)
+create_plot_grid(df_list, axhline=exp_pos_proportion)
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_13_0.png)
+    --------------------------------------
+
+    NameErrorTraceback (most recent call last)
+
+    <ipython-input-119-0a24264c9aa7> in <module>
+          2 df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() / 
+          3                users_df[col].dropna().value_counts()
+    ----> 4                for col in comm_cols]
+          5 
+          6 # Calculate expected proportion of positive cases given independence:
+
+
+    NameError: name 'comm_cols' is not defined
 
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
@@ -578,7 +597,7 @@ A chi-squre analysis is performed on the output of each detection algorithm with
 ```python
 import scipy.stats as scs
 
-def chi_square(x, y):
+def chi_square(X, y):
     '''
     Calculate chi-square statistic between two rows.
     Eliminates rows where cell value is below threshold
@@ -588,7 +607,7 @@ def chi_square(x, y):
     
     MIN_CELL_VAL = 5
     
-    confusion_matrix = pd.crosstab(x, y)
+    confusion_matrix = pd.crosstab(X, y)
     # Eliminate rows where observed cases are below threshold:
     confusion_matrix = confusion_matrix[(confusion_matrix >= MIN_CELL_VAL).all(1)]
     # Check dimensions, as eliminating shorter rows is preferred.
@@ -691,11 +710,17 @@ from sklearn.feature_selection import chi2
 # This method calculates each metric separately, so fewer rows are dropped.
 def get_chi2_sklearn_df(X, y):
     cols = X.columns    
-    data = [[k[0] for k in chi2(
+#     data = [[k[0] for k in chi2(
+#                                 X[col].dropna().to_frame(), 
+#                                 y[X[col].notna()]
+#                                 )
+#             ] for col in cols]
+    
+    data = []
+    for col in cols:
+        data.append( [k[0] for k in chi2(
                                 X[col].dropna().to_frame(), 
-                                y[X[col].notna()]
-                                )
-            ] for col in cols]
+                                y[X[col].notna()])])
     chi2b_df = pd.DataFrame(data=data, columns=['chi-sq-b', 'chi-sq-b p-val'], index=cols)
     return chi2b_df
 
@@ -718,18 +743,18 @@ chi2b_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>116.916736</td>
-      <td>2.993758e-27</td>
+      <td>55.752662</td>
+      <td>8.218691e-14</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>5309.547802</td>
-      <td>0.000000e+00</td>
+      <td>52.367253</td>
+      <td>4.603366e-13</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>9890.865080</td>
-      <td>0.000000e+00</td>
+      <td>2.756299</td>
+      <td>9.687211e-02</td>
     </tr>
     <tr>
       <th>c_fluid</th>
@@ -738,8 +763,8 @@ chi2b_df
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>273.428804</td>
-      <td>2.030642e-61</td>
+      <td>295.778228</td>
+      <td>2.738891e-66</td>
     </tr>
   </tbody>
 </table>
@@ -759,10 +784,12 @@ $${\phi}_c = \sqrt{\frac{\chi^2}{N(k-1)}}$$
 
 
 ```python
+import numpy as np
+
 def cramers_v(x, y):
     confusion_matrix = pd.crosstab(x,y)
     #chi2 = scs.chi2_contingency(confusion_matrix)[0]
-    chi2 = chi_square_of_series(x, y)[0]
+    chi2 = chi_square(x, y)[0]
     n = confusion_matrix.sum().sum()
     phi2 = chi2/n
     r,k = confusion_matrix.shape
@@ -798,15 +825,15 @@ cramers_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.391784</td>
+      <td>0.499062</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.000000</td>
+      <td>0.331235</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.000000</td>
+      <td>0.467963</td>
     </tr>
     <tr>
       <th>c_fluid</th>
@@ -814,7 +841,7 @@ cramers_df
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.442901</td>
+      <td>0.474934</td>
     </tr>
   </tbody>
 </table>
@@ -824,6 +851,8 @@ cramers_df
 
 ### Theil's U
 While Cramer's Phi measures the strength of the association, Theil's U is a conditional measure. That is, it is able to measure how well we can predict one variable, given the other. Therefore, it is a more suitable statistic when evaluating features to use in prediction models.
+
+In essence: 'given Y, what fraction of the bits of X can we predict?'
 
 
 
@@ -843,6 +872,7 @@ def conditional_entropy(x, y, log_base: float = math.e):
     return entropy
 
 def theils_u(x, y):
+    '''given Y, what fraction of the bits of X can we predict?'''
     s_xy = conditional_entropy(x,y)
     x_counter = Counter(x)
     total_occurrences = sum(x_counter.values())
@@ -857,17 +887,9 @@ def theils_u(x, y):
 
 ```python
 def get_theils_df(X, y):
-    '''
-    Returns importances of X variables as determined by
-    random forest model.
-    
-    X: dataframe
-    Y: series
-    '''
     cols = X.columns
-    # TODO: Appears to be issue with order of x,y here.
+    # Swap X and y positions to match Theil format:
     data = [theils_u(y[X[col].notna()], X[col].dropna()) for col in cols]
-    #data = [theils_u(X[col].dropna(), y[X[col].notna()]) for col in cols]
     theils_df = pd.DataFrame(data=data, columns=['theils_u'], index=cols)
     return theils_df
 
@@ -889,15 +911,15 @@ theils_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.266495</td>
+      <td>0.228286</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.322568</td>
+      <td>0.142234</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.463284</td>
+      <td>0.233647</td>
     </tr>
     <tr>
       <th>c_fluid</th>
@@ -905,7 +927,7 @@ theils_df
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.265259</td>
+      <td>0.258152</td>
     </tr>
   </tbody>
 </table>
@@ -965,23 +987,23 @@ rf_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.241897</td>
+      <td>0.248872</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.072474</td>
+      <td>0.076402</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.162913</td>
+      <td>0.160641</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>0.334550</td>
+      <td>0.326263</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.188167</td>
+      <td>0.187823</td>
     </tr>
   </tbody>
 </table>
@@ -997,7 +1019,7 @@ df_list = [chi2a_df, chi2b_df, cramers_df, theils_df, rf_df]
 # Plot only first column:
 df_list = [x.iloc[:,0] for x in df_list]
 
-plot_dfs_as_bar(df_list)
+create_plot_grid(df_list)
 ```
 
 
@@ -1010,7 +1032,7 @@ While the analysis above demonstrates the predictive power of these algorithms a
 
 Data was collected over the course of several days for this event, therefore we can create subgraphs at intervals an re-calculate the metrics discussed above. This function creates a subgraph as it existed at every 24-hour interval from the event start time. Therefore, for the Hurricane Harvey event, which was recorded over 7 days and 10 hours, 7 sub-graphs are generated. With the final graph, there are a total of 8 graphs. Each graph contains all the data of the graph preceding it plus the newly observed users and their common relationships.
 
-The same transormations as above are then applied and the association measures calculated. It is expected that the measures increase over time, as the network structure is revealed. We are therefore interested in observing the rate at which is happens.
+The same transormations as above are then applied and the association measures calculated. It is expected that the measures increase over time, as the network structure is revealed. We are therefore interested in observing the rate at which this happens.
 
 
 ```python
@@ -1153,18 +1175,18 @@ for key in g_dict:
         s = users_df_temp[col].value_counts()
         users_df_temp.loc[~users_df_temp[col].isin(s.index[s >= MIN_COMMUNITY_SIZE]), col] = np.NaN
 
-    X = users_df_temp[comm_cols]
-    y = users_df_temp['coded_as_witness']
-    # Calculate chi-square
-    tslice_chi2a_df[key] = get_chi2_df(X, y).iloc[:,0]
-    # Calculate chi-square b
-    tslice_chi2b_df[key] = get_chi2_sklearn_df(X, y).iloc[:,0]
+    X2 = users_df_temp[comm_cols]
+    y2 = users_df_temp['coded_as_witness']
+    # Chi-square
+    tslice_chi2a_df[key] = get_chi2_df(X2, y2).iloc[:,0]
+    # Chi-square sklearn
+    tslice_chi2b_df[key] = get_chi2_sklearn_df(X2, y2).iloc[:,0]
     # Cramer's V
-    tslice_cramers_df[key] = get_cramers_df(X, y).iloc[:,0]
+    tslice_cramers_df[key] = get_cramers_df(X2, y2).iloc[:,0]
     # Theil's U
-    tslice_theils_df[key] = get_theils_df(X, y).iloc[:,0]
+    tslice_theils_df[key] = get_theils_df(X2, y2).iloc[:,0]
     # Random Forest
-    tslice_rf_df[key] = get_rf_importances(X, y).iloc[:,0]
+    tslice_rf_df[key] = get_rf_importance_df(X2, y2).iloc[:,0]
 ```
 
     Processing subgraph:  7
@@ -1183,6 +1205,8 @@ for key in g_dict:
     Importing existing community graph object...
 
 
+We can now inspect the rate of growth over the collection period. Edges are only included if they are connected to an existing user, therefore their growth should accelerate as the available users with which to connect increases.
+
 
 ```python
 node_counts = pd.Series([len(g) for g in g_dict_comm.values()] + [0]).iloc[::-1].reset_index(drop=True)
@@ -1190,40 +1214,99 @@ node_counts.name = 'nodes'
 edge_counts = pd.Series([g.number_of_edges() for g in g_dict_comm.values()] + [0]).iloc[::-1].reset_index(drop=True)
 edge_counts.name = 'edges'
 dff = pd.concat([node_counts, edge_counts], axis=1)
-#dff.loc['final'] = [18409, 76341] # TODO: Hardcoded for convenience. Find original graph object instead (largest component).
+
+dff.loc['final'] = [len(G), G.number_of_edges()]
 dff.plot(title='Graph Growth per 24h')
+dff
 ```
 
 
 
 
-    <matplotlib.axes._subplots.AxesSubplot at 0x7f7df2e329e8>
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>nodes</th>
+      <th>edges</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>0</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2288</td>
+      <td>9990</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>3723</td>
+      <td>16733</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>6407</td>
+      <td>29516</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>10031</td>
+      <td>46996</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>13163</td>
+      <td>64469</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>16179</td>
+      <td>83982</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>18067</td>
+      <td>98005</td>
+    </tr>
+    <tr>
+      <th>final</th>
+      <td>18409</td>
+      <td>100257</td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_34_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_35_1.png)
 
 
 
 ```python
-#Sort columns chonologically:
+# Sort columns chronologically:
 dfs = [tslice_chi2a_df, tslice_chi2b_df, tslice_cramers_df, tslice_theils_df, tslice_rf_df]
 
 for df in dfs:
     df.sort_index(axis=1, inplace=True)
-```
-
-
-```python
+    
 # Append the final graph values to each dataframe:
 tslice_chi2a_df['final'] = chi2a_df.iloc[:,0]
 tslice_chi2b_df['final'] = chi2b_df.iloc[:,0]
 tslice_cramers_df['final'] = cramers_df.iloc[:,0]
 tslice_theils_df['final'] = theils_df.iloc[:,0]
 tslice_rf_df['final'] = rf_df.iloc[:,0]
-
 ```
+
+The association measures can now be viewed over the time slice periods. Their growth over time will illustrate the emergence of the graph structure as seen in the final graph. Where association measures are poor for early values if `t`,  modularity measures may not provide adequate predictive power in earlier graphs and therefore using the metrics may not be feasible in a live classification application. Ideally, the higher association measures will emerge early.
+
+We expect the chi-square values to generally increase as the graph size increases; this does not represent an increasing association but is a function of the formula. They are presented here for reference.
 
 
 ```python
@@ -1231,24 +1314,10 @@ colnames = tslice_chi2a_df.columns
 
 print('chi-square a')
 series_list = [tslice_chi2a_df.iloc[i] for i in range(len(tslice_chi2a_df))]
-plot_dfs_as_bar(series_list)
+create_plot_grid(series_list)
 ```
 
     chi-square a
-
-
-
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_37_1.png)
-
-
-
-```python
-print('chi-square b')
-series_list = [tslice_chi2b_df.iloc[i] for i in range(len(tslice_chi2b_df))]
-plot_dfs_as_bar(series_list)
-```
-
-    chi-square b
 
 
 
@@ -1257,12 +1326,12 @@ plot_dfs_as_bar(series_list)
 
 
 ```python
-print('Cramer\'s v')
-series_list = [tslice_cramers_df.iloc[i] for i in range(len(tslice_cramers_df))]
-plot_dfs_as_bar(series_list)
+print('chi-square b')
+series_list = [tslice_chi2b_df.iloc[i] for i in range(len(tslice_chi2b_df))]
+create_plot_grid(series_list)
 ```
 
-    Cramer's v
+    chi-square b
 
 
 
@@ -1271,12 +1340,12 @@ plot_dfs_as_bar(series_list)
 
 
 ```python
-print('Theil\'s U')
-series_list = [tslice_theils_df.iloc[i] for i in range(len(tslice_theils_df))]
-plot_dfs_as_bar(series_list)
+print('Cramer\'s v')
+series_list = [tslice_cramers_df.iloc[i] for i in range(len(tslice_cramers_df))]
+create_plot_grid(series_list)
 ```
 
-    Theil\s U
+    Cramer's v
 
 
 
@@ -1285,17 +1354,160 @@ plot_dfs_as_bar(series_list)
 
 
 ```python
+print('Theil\'s U')
+series_list = [tslice_theils_df.iloc[i] for i in range(len(tslice_theils_df))]
+create_plot_grid(series_list)
+```
+
+    Theil's U
+
+
+
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
+
+
+
+```python
 print('RF Feature Importance')
 series_list = [tslice_rf_df.iloc[i] for i in range(len(tslice_rf_df))]
-plot_dfs_as_bar(series_list)
+create_plot_grid(series_list)
 ```
 
     RF Feature Importance
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
 
+
+The stability in the Theil's U and Random Forest metrics suggest that the associations are strong even in smaller graphs. Therefore using these community data throughout the collection process in live classification is a viable strategy. Theil's U measures the fraction of Y (witness labels) we can predict using the community measures. The highest and most stable over time algorithms therefore appear to be c_modularity, c_label_prop_async, and c_louvain. Each of these shows a value of approximately .20-.25 over the course of the collection period.
+
+As community labels are qualitative, we now need to convert them to quantifiable metrics so that we can train a model that is able to generalise to new data (rather than simply learning the community label name). 
+
+## Quantifying Community Structure
+
+The analysis above has measured whether there is an association between the (qualitative) community label, and the target class. This association has been shown to exist, meaning 'witness' users tend to co-appear in certain communities. To be able to use community data in a machine-learning model, the communities labels must be converted into a value which can be generalised to new datasets. A clustering algorithm may label communities arbitrarily and this will be different on each dataset, therefore these labels must be converted into some measure that can be generalised between datasets.
+
+In the current structure, communities are ranked by size. This could be a suitable metric: perhaps witness accounts are most common in the largest community. This has been observed in the output of, for example, the `c_fluid` algorithm, but is not consistant with the other algorithms' labels.
+
+In this section, various measures by which to characterise the communities are calculated, and their correlation to the target label is evaluated. In essence, we are hoping that the network structure within the communities with more 'witness' nodes is significantly different to the other communities.
+
+
+```python
+e = Event.objects.all()[0]
+filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
+
+G = get_graph_object()
+G = calc_community_metrics(G, filename)
+```
+
+    Importing existing graph object...
+    Importing existing community graph object...
+
+
+
+```python
+def get_subgraphs_by_attr(G, attr, min_subgraph_size=0):
+    '''
+    Returns a dictionary of subgraphs of graph G
+    based on the attribute passed.
+    Dictionary is keyed by attribute label.
+    '''
+    subgraph_dict = {}
+    node_data = list(nx.get_node_attributes(G, attr).values())
+    labels = set(node_data)
+
+    for label in labels:
+        count = sum([1 for x in node_data if x == label])
+        # Exclude subgraphs below provided threshold.
+        if count < min_subgraph_size:
+            continue
+        # Node generator:
+        nodes = ( node for node, data in G.nodes(data=True) if data.get(attr) == label )
+        subgraph = G.subgraph(nodes)
+        subgraph_dict[label] = subgraph
+    return subgraph_dict
+```
+
+
+```python
+#subgraphs_dict = get_subgraphs_by_attr(G, 'c_modularity', MIN_COMMUNITY_SIZE)
+subgraphs_dict = get_subgraphs_by_attr(G, 'c_modularity', 50)
+```
+
+
+```python
+def calc_network_metrics(G):
+    # (Currently ignores reciprocal relationships?)
+    
+    result_dict = {}
+    
+    # Create undirected graph:
+    G = nx.Graph(G)
+    n = len(G)
+    
+    # Generate Erdős-Rényi graph or a binomial graph.
+    max_edges = n*(n-1)/2
+    pr_edge = G.number_of_edges() / max_edges
+    R = nx.gnp_random_graph(n, pr_edge)
+    
+    result_dict['nodes'] = n
+    result_dict['edges'] = G.number_of_edges()
+    # Max shortest path
+    result_dict['diameter'] = nx.diameter(G)
+    result_dict['ex_diameter'] = nx.diameter(R)
+    result_dict['diameter_diff'] = result_dict['diameter'] - result_dict['ex_diameter']
+    
+    # Transitivity: fraction of all possible triangles present in G.
+    transitivity = nx.transitivity(G)
+    result_dict['transitivity'] = transitivity
+    ex_transitivity = nx.transitivity(R)
+    result_dict['ex_transitivity'] = ex_transitivity
+    result_dict['transitivity_diff'] = transitivity - ex_transitivity
+    
+    # Clustering: fraction of possible triangles through that a node that exist
+    average_clustering = nx.average_clustering(G)
+    result_dict['average_clustering'] = average_clustering
+    
+    average_degree = G.number_of_edges() / n
+    result_dict['average_degree'] = average_degree
+    
+    average_shortest_path_length = nx.average_shortest_path_length(G)
+    result_dict['average_shortest_path_length'] = average_shortest_path_length
+    
+    degree_centrality = nx.degree_centrality(G)
+    avg_degree_centrality = sum([v for k, v in degree_centrality.items()]) / n
+    result_dict['avg_degree_centrality'] = avg_degree_centrality
+    
+    eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=1000)
+    eigenvector_centrality = sum([v for k, v in eigenvector_centrality.items()]) / n
+    result_dict['eigenvector_centrality'] = eigenvector_centrality
+    
+    return result_dict
+    
+```
+
+
+```python
+results_df = pd.DataFrame()
+
+for k, v in subgraphs_dict.items():
+    results = calc_network_metrics(v)    
+    results_df[k] = results.values()
+    
+results_df.index = results.keys()
+results_df = results_df.T
+
+if not results_df['nodes'].is_monotonic_decreasing:
+    print('WARNING: Communities not sorted by size')
+
+results_df.head()
+```
+
+
+```python
+create_plot_grid([results_df[c] for c in results_df.columns], kind='line')
+```
 
 
 ```python
