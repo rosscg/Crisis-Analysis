@@ -508,9 +508,11 @@ def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
     
     # Plot single chart without grid
     if len(df_list) == 1:
-        df_list[0].plot(kind=kind, colormap='Spectral', rot=45)
         if titles:
-            ax.set_title(titles[0])
+            df_list[0].plot(kind=kind, colormap='Spectral', title=titles[0], rot=45)
+            #ax.set_title(titles[0])
+        else:
+            df_list[0].plot(kind=kind, colormap='Spectral', rot=45)
         return
     
     ncol = 2
@@ -1544,6 +1546,7 @@ min_community_size = 50
 subgraphs_dict = get_subgraphs_by_attr(G, comm_name, min_community_size)
 
 results_df = get_network_metrics_df(subgraphs_dict, comm_name)
+
 results_df.head()
 ```
 
@@ -1985,47 +1988,496 @@ results_df.head()
 
 
 ```python
-create_plot_grid([results_df[c] for c in results_df.columns], kind='line')
+# Calculate ratio of positive cases per community label:
+
+tot = temp_df.loc[temp_df['c_modularity'].notna() == True]
+
+ratio_list = []
+
+for comm in results_df.index:
+    tot2 = tot.loc[tot['c_modularity'] == comm]
+    pos = tot2.loc[tot2['coded_as_witness'] == 1]
+    if tot2.shape[0] > 0:
+        ratio_list.append(pos.shape[0]/tot2.shape[0])
+    else:
+        ratio_list.append(None)
+
+
+results_df['pos_ratio'] = ratio_list
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_50_0.png)
+```python
+# Sort dataframe by pos_ratio (high to low)
+tdf = results_df.sort_values(by=['pos_ratio'], ascending=False).reset_index()
+tdf.rename(columns={'index': 'size_rank'}, inplace=True)
+
+create_plot_grid([tdf[[c]] for c in tdf.columns], kind='line')
+
+# TODO: try excluding smaller communities, or smaller coded amounts
+```
+
+
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_51_0.png)
 
 
 
 ```python
-temp_df = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
-temp_df['c_modularity'].value_counts()
+tdf
 ```
 
 
 
 
-    0.0     37
-    2.0     36
-    1.0     31
-    12.0    14
-    7.0     10
-    5.0     10
-    13.0     7
-    3.0      6
-    4.0      4
-    9.0      3
-    8.0      3
-    6.0      3
-    80.0     2
-    23.0     1
-    41.0     1
-    48.0     1
-    10.0     1
-    72.0     1
-    46.0     1
-    14.0     1
-    15.0     1
-    21.0     1
-    27.0     1
-    43.0     1
-    Name: c_modularity, dtype: int64
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>size_rank</th>
+      <th>nodes</th>
+      <th>edges</th>
+      <th>avg_degree</th>
+      <th>avg_shortest_path_length</th>
+      <th>diameter</th>
+      <th>ex_diameter</th>
+      <th>diameter_diff</th>
+      <th>transitivity</th>
+      <th>ex_transitivity</th>
+      <th>transitivity_diff</th>
+      <th>avg_clustering</th>
+      <th>avg_degree_centrality</th>
+      <th>avg_eigenvector_centrality</th>
+      <th>avg_betweenness_centrality</th>
+      <th>avg_load_centrality</th>
+      <th>avg_closeness_centrality</th>
+      <th>pos_ratio</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>13</td>
+      <td>133.0</td>
+      <td>150.0</td>
+      <td>1.127820</td>
+      <td>11.425268</td>
+      <td>32.0</td>
+      <td>10.0</td>
+      <td>22.0</td>
+      <td>0.159091</td>
+      <td>0.031847</td>
+      <td>0.127244</td>
+      <td>0.089694</td>
+      <td>0.017088</td>
+      <td>0.030395</td>
+      <td>0.079582</td>
+      <td>0.079582</td>
+      <td>0.092099</td>
+      <td>0.857143</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>2</td>
+      <td>3287.0</td>
+      <td>6635.0</td>
+      <td>2.018558</td>
+      <td>5.930651</td>
+      <td>14.0</td>
+      <td>13.0</td>
+      <td>1.0</td>
+      <td>0.127956</td>
+      <td>0.001022</td>
+      <td>0.126934</td>
+      <td>0.061256</td>
+      <td>0.001229</td>
+      <td>0.003808</td>
+      <td>0.001501</td>
+      <td>0.001501</td>
+      <td>0.172470</td>
+      <td>0.750000</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>7</td>
+      <td>180.0</td>
+      <td>233.0</td>
+      <td>1.294444</td>
+      <td>7.580881</td>
+      <td>21.0</td>
+      <td>10.0</td>
+      <td>11.0</td>
+      <td>0.192440</td>
+      <td>0.016575</td>
+      <td>0.175865</td>
+      <td>0.143187</td>
+      <td>0.014463</td>
+      <td>0.031622</td>
+      <td>0.036971</td>
+      <td>0.036971</td>
+      <td>0.138699</td>
+      <td>0.700000</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>9</td>
+      <td>166.0</td>
+      <td>250.0</td>
+      <td>1.506024</td>
+      <td>9.399854</td>
+      <td>23.0</td>
+      <td>10.0</td>
+      <td>13.0</td>
+      <td>0.492568</td>
+      <td>0.010502</td>
+      <td>0.482066</td>
+      <td>0.121348</td>
+      <td>0.018255</td>
+      <td>0.026759</td>
+      <td>0.051219</td>
+      <td>0.051219</td>
+      <td>0.112386</td>
+      <td>0.666667</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>0</td>
+      <td>3889.0</td>
+      <td>25199.0</td>
+      <td>6.479558</td>
+      <td>3.639366</td>
+      <td>8.0</td>
+      <td>5.0</td>
+      <td>3.0</td>
+      <td>0.136930</td>
+      <td>0.003144</td>
+      <td>0.133786</td>
+      <td>0.180881</td>
+      <td>0.003333</td>
+      <td>0.007359</td>
+      <td>0.000679</td>
+      <td>0.000679</td>
+      <td>0.279271</td>
+      <td>0.594595</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>4</td>
+      <td>1205.0</td>
+      <td>2018.0</td>
+      <td>1.674689</td>
+      <td>6.972231</td>
+      <td>18.0</td>
+      <td>13.0</td>
+      <td>5.0</td>
+      <td>0.219641</td>
+      <td>0.001384</td>
+      <td>0.218257</td>
+      <td>0.105341</td>
+      <td>0.002782</td>
+      <td>0.006279</td>
+      <td>0.004964</td>
+      <td>0.004964</td>
+      <td>0.147765</td>
+      <td>0.500000</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>6</td>
+      <td>242.0</td>
+      <td>280.0</td>
+      <td>1.157025</td>
+      <td>12.790885</td>
+      <td>35.0</td>
+      <td>14.0</td>
+      <td>21.0</td>
+      <td>0.161379</td>
+      <td>0.000000</td>
+      <td>0.161379</td>
+      <td>0.106915</td>
+      <td>0.009602</td>
+      <td>0.014630</td>
+      <td>0.049129</td>
+      <td>0.049129</td>
+      <td>0.082649</td>
+      <td>0.333333</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>5</td>
+      <td>956.0</td>
+      <td>1273.0</td>
+      <td>1.331590</td>
+      <td>7.723490</td>
+      <td>20.0</td>
+      <td>17.0</td>
+      <td>3.0</td>
+      <td>0.142832</td>
+      <td>0.000828</td>
+      <td>0.142004</td>
+      <td>0.101710</td>
+      <td>0.002789</td>
+      <td>0.006074</td>
+      <td>0.007048</td>
+      <td>0.007048</td>
+      <td>0.133699</td>
+      <td>0.300000</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>1</td>
+      <td>3561.0</td>
+      <td>15914.0</td>
+      <td>4.468969</td>
+      <td>4.393341</td>
+      <td>11.0</td>
+      <td>7.0</td>
+      <td>4.0</td>
+      <td>0.188485</td>
+      <td>0.002732</td>
+      <td>0.185753</td>
+      <td>0.176010</td>
+      <td>0.002511</td>
+      <td>0.004862</td>
+      <td>0.000953</td>
+      <td>0.000953</td>
+      <td>0.232554</td>
+      <td>0.258065</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>3</td>
+      <td>2409.0</td>
+      <td>6542.0</td>
+      <td>2.715650</td>
+      <td>4.997184</td>
+      <td>13.0</td>
+      <td>10.0</td>
+      <td>3.0</td>
+      <td>0.134199</td>
+      <td>0.001555</td>
+      <td>0.132644</td>
+      <td>0.133748</td>
+      <td>0.002256</td>
+      <td>0.006513</td>
+      <td>0.001661</td>
+      <td>0.001661</td>
+      <td>0.205649</td>
+      <td>0.166667</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>12</td>
+      <td>139.0</td>
+      <td>153.0</td>
+      <td>1.100719</td>
+      <td>9.883954</td>
+      <td>22.0</td>
+      <td>15.0</td>
+      <td>7.0</td>
+      <td>0.180822</td>
+      <td>0.010345</td>
+      <td>0.170477</td>
+      <td>0.106224</td>
+      <td>0.015952</td>
+      <td>0.020490</td>
+      <td>0.064846</td>
+      <td>0.064846</td>
+      <td>0.104404</td>
+      <td>0.071429</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>8</td>
+      <td>166.0</td>
+      <td>194.0</td>
+      <td>1.168675</td>
+      <td>8.371376</td>
+      <td>18.0</td>
+      <td>14.0</td>
+      <td>4.0</td>
+      <td>0.278409</td>
+      <td>0.000000</td>
+      <td>0.278409</td>
+      <td>0.083104</td>
+      <td>0.014166</td>
+      <td>0.020026</td>
+      <td>0.044947</td>
+      <td>0.044947</td>
+      <td>0.124707</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>10</td>
+      <td>156.0</td>
+      <td>181.0</td>
+      <td>1.160256</td>
+      <td>11.538296</td>
+      <td>27.0</td>
+      <td>15.0</td>
+      <td>12.0</td>
+      <td>0.166998</td>
+      <td>0.017241</td>
+      <td>0.149757</td>
+      <td>0.100557</td>
+      <td>0.014971</td>
+      <td>0.024958</td>
+      <td>0.068430</td>
+      <td>0.068430</td>
+      <td>0.090337</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>14</td>
+      <td>125.0</td>
+      <td>164.0</td>
+      <td>1.312000</td>
+      <td>8.039226</td>
+      <td>21.0</td>
+      <td>11.0</td>
+      <td>10.0</td>
+      <td>0.229091</td>
+      <td>0.033149</td>
+      <td>0.195942</td>
+      <td>0.106358</td>
+      <td>0.021161</td>
+      <td>0.032551</td>
+      <td>0.057229</td>
+      <td>0.057229</td>
+      <td>0.131792</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>15</td>
+      <td>106.0</td>
+      <td>114.0</td>
+      <td>1.075472</td>
+      <td>8.125966</td>
+      <td>17.0</td>
+      <td>14.0</td>
+      <td>3.0</td>
+      <td>0.118110</td>
+      <td>0.039130</td>
+      <td>0.078980</td>
+      <td>0.068643</td>
+      <td>0.020485</td>
+      <td>0.031152</td>
+      <td>0.068519</td>
+      <td>0.068519</td>
+      <td>0.126938</td>
+      <td>0.000000</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>11</td>
+      <td>155.0</td>
+      <td>223.0</td>
+      <td>1.438710</td>
+      <td>5.578718</td>
+      <td>17.0</td>
+      <td>11.0</td>
+      <td>6.0</td>
+      <td>0.169385</td>
+      <td>0.017266</td>
+      <td>0.152119</td>
+      <td>0.124592</td>
+      <td>0.018685</td>
+      <td>0.038476</td>
+      <td>0.029926</td>
+      <td>0.029926</td>
+      <td>0.192470</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>16</td>
+      <td>69.0</td>
+      <td>78.0</td>
+      <td>1.130435</td>
+      <td>6.555840</td>
+      <td>14.0</td>
+      <td>9.0</td>
+      <td>5.0</td>
+      <td>0.200957</td>
+      <td>0.032787</td>
+      <td>0.168170</td>
+      <td>0.096926</td>
+      <td>0.033248</td>
+      <td>0.051605</td>
+      <td>0.082923</td>
+      <td>0.082923</td>
+      <td>0.159225</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>17</th>
+      <td>17</td>
+      <td>61.0</td>
+      <td>74.0</td>
+      <td>1.213115</td>
+      <td>5.230601</td>
+      <td>13.0</td>
+      <td>11.0</td>
+      <td>2.0</td>
+      <td>0.156522</td>
+      <td>0.049451</td>
+      <td>0.107071</td>
+      <td>0.102719</td>
+      <td>0.040437</td>
+      <td>0.070094</td>
+      <td>0.071705</td>
+      <td>0.071705</td>
+      <td>0.201406</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>18</th>
+      <td>18</td>
+      <td>60.0</td>
+      <td>60.0</td>
+      <td>1.000000</td>
+      <td>8.976271</td>
+      <td>22.0</td>
+      <td>11.0</td>
+      <td>11.0</td>
+      <td>0.026786</td>
+      <td>0.061224</td>
+      <td>-0.034439</td>
+      <td>0.034127</td>
+      <td>0.033898</td>
+      <td>0.059709</td>
+      <td>0.137522</td>
+      <td>0.137522</td>
+      <td>0.115692</td>
+      <td>NaN</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>19</td>
+      <td>60.0</td>
+      <td>116.0</td>
+      <td>1.933333</td>
+      <td>3.951412</td>
+      <td>12.0</td>
+      <td>6.0</td>
+      <td>6.0</td>
+      <td>0.284598</td>
+      <td>0.082452</td>
+      <td>0.202146</td>
+      <td>0.233917</td>
+      <td>0.065537</td>
+      <td>0.082205</td>
+      <td>0.050886</td>
+      <td>0.050886</td>
+      <td>0.274479</td>
+      <td>NaN</td>
+    </tr>
+  </tbody>
+</table>
+</div>
 
 
 
