@@ -565,19 +565,7 @@ create_plot_grid(df_list, axhline=exp_pos_proportion)
 ```
 
 
-    --------------------------------------
-
-    NameErrorTraceback (most recent call last)
-
-    <ipython-input-119-0a24264c9aa7> in <module>
-          2 df_list = [users_df.loc[users_df['coded_as_witness']==1, col].dropna().value_counts() / 
-          3                users_df[col].dropna().value_counts()
-    ----> 4                for col in comm_cols]
-          5 
-          6 # Calculate expected proportion of positive cases given independence:
-
-
-    NameError: name 'comm_cols' is not defined
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_13_0.png)
 
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
@@ -987,23 +975,23 @@ rf_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.248872</td>
+      <td>0.242374</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.076402</td>
+      <td>0.074022</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.160641</td>
+      <td>0.167264</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>0.326263</td>
+      <td>0.327971</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.187823</td>
+      <td>0.188368</td>
     </tr>
   </tbody>
 </table>
@@ -1394,16 +1382,117 @@ In this section, various measures by which to characterise the communities are c
 
 
 ```python
-e = Event.objects.all()[0]
-filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
+def calc_network_metrics(G):
+    ''' Calculates various metrics summarising a graph object '''
+    # TODO: Consider evaluating reciprocal relationship rate.
 
-G = get_graph_object()
-G = calc_community_metrics(G, filename)
+    result_dict = {}
+    
+    # Create undirected graph:
+    G = nx.Graph(G)
+    n = len(G)
+    
+    result_dict['nodes'] = n
+    result_dict['edges'] = G.number_of_edges()
+    
+    avg_degree = G.number_of_edges() / n
+    result_dict['avg_degree'] = avg_degree
+    
+    avg_shortest_path_length = nx.average_shortest_path_length(G)
+    result_dict['avg_shortest_path_length'] = avg_shortest_path_length
+    
+    # Generate Erdős-Rényi graph or a binomial graph.
+    max_edges = n*(n-1)/2
+    pr_edge = G.number_of_edges() / max_edges
+    R = nx.gnp_random_graph(n, pr_edge)
+    
+    # Max shortest path (diameter) and expected diameter:
+    result_dict['diameter'] = nx.diameter(G)
+    # result_dict['ex_diameter'] = nx.diameter(nx.connected_component_subgraphs(R)[0])
+    Rcc = max(nx.connected_components(R), key=len)
+    result_dict['ex_diameter'] = nx.diameter(R.subgraph(Rcc))
+    result_dict['diameter_diff'] = result_dict['diameter'] - result_dict['ex_diameter']
+    
+    # Transitivity: fraction of all possible triangles present in G. (global clustering)
+    transitivity = nx.transitivity(G)
+    result_dict['transitivity'] = transitivity
+    ex_transitivity = nx.transitivity(R)
+    result_dict['ex_transitivity'] = ex_transitivity
+    result_dict['transitivity_diff'] = transitivity - ex_transitivity
+    
+    # Clustering: fraction of possible triangles through a node that exist
+    avg_clustering = nx.average_clustering(G)
+    result_dict['avg_clustering'] = avg_clustering
+    
+    # The degree centrality for a node v is the fraction of nodes connected to it
+    degree_centrality = nx.degree_centrality(G)
+    avg_degree_centrality = sum([v for k, v in degree_centrality.items()]) / n
+    result_dict['avg_degree_centrality'] = avg_degree_centrality
+    
+    # Eigenvector centrality computes the centrality for a node based on the centrality of its neighbors.
+    eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=1000)
+    avg_eigenvector_centrality = sum([v for k, v in eigenvector_centrality.items()]) / n
+    result_dict['avg_eigenvector_centrality'] = avg_eigenvector_centrality
+    
+    # Betweenness centrality of a node v is the sum of the fraction of all-pairs shortest paths that pass through v
+    betweenness_centrality = nx.betweenness_centrality(G)
+    avg_betweenness_centrality = sum([v for k, v in betweenness_centrality.items()]) / n
+    result_dict['avg_betweenness_centrality'] = avg_betweenness_centrality
+    
+    # The load centrality of a node is the fraction of all shortest paths that pass through that node. (Load centrality is slightly different than betweenness)
+    load_centrality = nx.load_centrality(G)
+    avg_load_centrality = sum([v for k, v in load_centrality.items()]) / n
+    result_dict['avg_load_centrality'] = avg_load_centrality
+    
+    # Closeness centrality [1] of a node u is the reciprocal of the sum of the shortest path distances from u to all n-1 other nodes
+    closeness_centrality = nx.closeness_centrality(G)
+    avg_closeness_centrality = sum([v for k, v in closeness_centrality.items()]) / n
+    result_dict['avg_closeness_centrality'] = avg_closeness_centrality
+
+    return result_dict
+    
 ```
 
-    Importing existing graph object...
-    Importing existing community graph object...
 
+```python
+def get_network_metrics_df(subgraphs_dict, title=None):
+    '''
+    Calculate network metrics for each subgraph in dict.
+    
+    Saves output to file, which is returned if available
+    to avoid recalculation
+    '''
+
+    # Return cached file if available.
+    if title:
+        filename = 'network_data_comm_metrics_{}.csv'.format(title)
+        try:
+            results_df = pd.read_csv(DIR + filename, index_col=0)
+            print('Returning cached file...')
+            return results_df
+        except:
+            pass
+    
+    results_df = pd.DataFrame()
+
+    print('Total community subgraphs: ', len(subgraphs_dict))
+    for k, v in subgraphs_dict.items():
+        print('Calculating metrics for community ID: ', k)
+        results = calc_network_metrics(v)    
+        results_df[k] = results.values()
+
+    results_df.index = results.keys()
+    results_df = results_df.T
+
+    if not results_df['nodes'].is_monotonic_decreasing:
+        print('WARNING: Communities not sorted by size')
+
+    # Save dataframe to cached file:
+    if title:
+        results_df.to_csv(DIR + filename)
+        
+    return results_df
+```
 
 
 ```python
@@ -1431,83 +1520,514 @@ def get_subgraphs_by_attr(G, attr, min_subgraph_size=0):
 
 
 ```python
+e = Event.objects.all()[0]
+filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
+
+G = get_graph_object()
+G = calc_community_metrics(G, filename)
+```
+
+    Importing existing graph object...
+    Importing existing community graph object...
+
+
+For now, we focus on the `c_modularity` community labels, and exclude communities smaller than 50.
+
+The complete graph is split by the modularity labels, and the network metrics for each subgraph are then calculated and stored in a dataframe.
+
+
+```python
+comm_name = 'c_modularity'
+min_community_size = 50
+
 #subgraphs_dict = get_subgraphs_by_attr(G, 'c_modularity', MIN_COMMUNITY_SIZE)
-subgraphs_dict = get_subgraphs_by_attr(G, 'c_modularity', 50)
-```
+subgraphs_dict = get_subgraphs_by_attr(G, comm_name, min_community_size)
 
-
-```python
-def calc_network_metrics(G):
-    # (Currently ignores reciprocal relationships?)
-    
-    result_dict = {}
-    
-    # Create undirected graph:
-    G = nx.Graph(G)
-    n = len(G)
-    
-    # Generate Erdős-Rényi graph or a binomial graph.
-    max_edges = n*(n-1)/2
-    pr_edge = G.number_of_edges() / max_edges
-    R = nx.gnp_random_graph(n, pr_edge)
-    
-    result_dict['nodes'] = n
-    result_dict['edges'] = G.number_of_edges()
-    # Max shortest path
-    result_dict['diameter'] = nx.diameter(G)
-    result_dict['ex_diameter'] = nx.diameter(R)
-    result_dict['diameter_diff'] = result_dict['diameter'] - result_dict['ex_diameter']
-    
-    # Transitivity: fraction of all possible triangles present in G.
-    transitivity = nx.transitivity(G)
-    result_dict['transitivity'] = transitivity
-    ex_transitivity = nx.transitivity(R)
-    result_dict['ex_transitivity'] = ex_transitivity
-    result_dict['transitivity_diff'] = transitivity - ex_transitivity
-    
-    # Clustering: fraction of possible triangles through that a node that exist
-    average_clustering = nx.average_clustering(G)
-    result_dict['average_clustering'] = average_clustering
-    
-    average_degree = G.number_of_edges() / n
-    result_dict['average_degree'] = average_degree
-    
-    average_shortest_path_length = nx.average_shortest_path_length(G)
-    result_dict['average_shortest_path_length'] = average_shortest_path_length
-    
-    degree_centrality = nx.degree_centrality(G)
-    avg_degree_centrality = sum([v for k, v in degree_centrality.items()]) / n
-    result_dict['avg_degree_centrality'] = avg_degree_centrality
-    
-    eigenvector_centrality = nx.eigenvector_centrality(G, max_iter=1000)
-    eigenvector_centrality = sum([v for k, v in eigenvector_centrality.items()]) / n
-    result_dict['eigenvector_centrality'] = eigenvector_centrality
-    
-    return result_dict
-    
-```
-
-
-```python
-results_df = pd.DataFrame()
-
-for k, v in subgraphs_dict.items():
-    results = calc_network_metrics(v)    
-    results_df[k] = results.values()
-    
-results_df.index = results.keys()
-results_df = results_df.T
-
-if not results_df['nodes'].is_monotonic_decreasing:
-    print('WARNING: Communities not sorted by size')
-
+results_df = get_network_metrics_df(subgraphs_dict, comm_name)
 results_df.head()
 ```
+
+    Total subgraphs:  20
+    Calculating metrics for community ID:  0
+    Calculating metrics for community ID:  1
+    Calculating metrics for community ID:  2
+    Calculating metrics for community ID:  3
+    Calculating metrics for community ID:  4
+    Calculating metrics for community ID:  5
+    Calculating metrics for community ID:  6
+    Calculating metrics for community ID:  7
+    Calculating metrics for community ID:  8
+    Calculating metrics for community ID:  9
+    Calculating metrics for community ID:  10
+    Calculating metrics for community ID:  11
+    Calculating metrics for community ID:  12
+    Calculating metrics for community ID:  13
+    Calculating metrics for community ID:  14
+    Calculating metrics for community ID:  15
+    Calculating metrics for community ID:  16
+    Calculating metrics for community ID:  17
+    Calculating metrics for community ID:  18
+    Calculating metrics for community ID:  19
+
+
+
+
+
+<div>
+<table border="1" class="dataframe">
+  <thead>
+    <tr style="text-align: right;">
+      <th></th>
+      <th>nodes</th>
+      <th>edges</th>
+      <th>avg_degree</th>
+      <th>avg_shortest_path_length</th>
+      <th>diameter</th>
+      <th>ex_diameter</th>
+      <th>diameter_diff</th>
+      <th>transitivity</th>
+      <th>ex_transitivity</th>
+      <th>transitivity_diff</th>
+      <th>avg_clustering</th>
+      <th>avg_degree_centrality</th>
+      <th>avg_eigenvector_centrality</th>
+      <th>avg_betweenness_centrality</th>
+      <th>avg_load_centrality</th>
+      <th>avg_closeness_centrality</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <th>0</th>
+      <td>3889.0</td>
+      <td>25199.0</td>
+      <td>6.479558</td>
+      <td>3.639366</td>
+      <td>8.0</td>
+      <td>5.0</td>
+      <td>3.0</td>
+      <td>0.136930</td>
+      <td>0.003144</td>
+      <td>0.133786</td>
+      <td>0.180881</td>
+      <td>0.003333</td>
+      <td>0.007359</td>
+      <td>0.000679</td>
+      <td>0.000679</td>
+      <td>0.279271</td>
+    </tr>
+    <tr>
+      <th>1</th>
+      <td>3561.0</td>
+      <td>15914.0</td>
+      <td>4.468969</td>
+      <td>4.393341</td>
+      <td>11.0</td>
+      <td>7.0</td>
+      <td>4.0</td>
+      <td>0.188485</td>
+      <td>0.002732</td>
+      <td>0.185753</td>
+      <td>0.176010</td>
+      <td>0.002511</td>
+      <td>0.004862</td>
+      <td>0.000953</td>
+      <td>0.000953</td>
+      <td>0.232554</td>
+    </tr>
+    <tr>
+      <th>2</th>
+      <td>3287.0</td>
+      <td>6635.0</td>
+      <td>2.018558</td>
+      <td>5.930651</td>
+      <td>14.0</td>
+      <td>13.0</td>
+      <td>1.0</td>
+      <td>0.127956</td>
+      <td>0.001022</td>
+      <td>0.126934</td>
+      <td>0.061256</td>
+      <td>0.001229</td>
+      <td>0.003808</td>
+      <td>0.001501</td>
+      <td>0.001501</td>
+      <td>0.172470</td>
+    </tr>
+    <tr>
+      <th>3</th>
+      <td>2409.0</td>
+      <td>6542.0</td>
+      <td>2.715650</td>
+      <td>4.997184</td>
+      <td>13.0</td>
+      <td>10.0</td>
+      <td>3.0</td>
+      <td>0.134199</td>
+      <td>0.001555</td>
+      <td>0.132644</td>
+      <td>0.133748</td>
+      <td>0.002256</td>
+      <td>0.006513</td>
+      <td>0.001661</td>
+      <td>0.001661</td>
+      <td>0.205649</td>
+    </tr>
+    <tr>
+      <th>4</th>
+      <td>1205.0</td>
+      <td>2018.0</td>
+      <td>1.674689</td>
+      <td>6.972231</td>
+      <td>18.0</td>
+      <td>13.0</td>
+      <td>5.0</td>
+      <td>0.219641</td>
+      <td>0.001384</td>
+      <td>0.218257</td>
+      <td>0.105341</td>
+      <td>0.002782</td>
+      <td>0.006279</td>
+      <td>0.004964</td>
+      <td>0.004964</td>
+      <td>0.147765</td>
+    </tr>
+    <tr>
+      <th>5</th>
+      <td>956.0</td>
+      <td>1273.0</td>
+      <td>1.331590</td>
+      <td>7.723490</td>
+      <td>20.0</td>
+      <td>17.0</td>
+      <td>3.0</td>
+      <td>0.142832</td>
+      <td>0.000828</td>
+      <td>0.142004</td>
+      <td>0.101710</td>
+      <td>0.002789</td>
+      <td>0.006074</td>
+      <td>0.007048</td>
+      <td>0.007048</td>
+      <td>0.133699</td>
+    </tr>
+    <tr>
+      <th>6</th>
+      <td>242.0</td>
+      <td>280.0</td>
+      <td>1.157025</td>
+      <td>12.790885</td>
+      <td>35.0</td>
+      <td>14.0</td>
+      <td>21.0</td>
+      <td>0.161379</td>
+      <td>0.000000</td>
+      <td>0.161379</td>
+      <td>0.106915</td>
+      <td>0.009602</td>
+      <td>0.014630</td>
+      <td>0.049129</td>
+      <td>0.049129</td>
+      <td>0.082649</td>
+    </tr>
+    <tr>
+      <th>7</th>
+      <td>180.0</td>
+      <td>233.0</td>
+      <td>1.294444</td>
+      <td>7.580881</td>
+      <td>21.0</td>
+      <td>10.0</td>
+      <td>11.0</td>
+      <td>0.192440</td>
+      <td>0.016575</td>
+      <td>0.175865</td>
+      <td>0.143187</td>
+      <td>0.014463</td>
+      <td>0.031622</td>
+      <td>0.036971</td>
+      <td>0.036971</td>
+      <td>0.138699</td>
+    </tr>
+    <tr>
+      <th>8</th>
+      <td>166.0</td>
+      <td>194.0</td>
+      <td>1.168675</td>
+      <td>8.371376</td>
+      <td>18.0</td>
+      <td>14.0</td>
+      <td>4.0</td>
+      <td>0.278409</td>
+      <td>0.000000</td>
+      <td>0.278409</td>
+      <td>0.083104</td>
+      <td>0.014166</td>
+      <td>0.020026</td>
+      <td>0.044947</td>
+      <td>0.044947</td>
+      <td>0.124707</td>
+    </tr>
+    <tr>
+      <th>9</th>
+      <td>166.0</td>
+      <td>250.0</td>
+      <td>1.506024</td>
+      <td>9.399854</td>
+      <td>23.0</td>
+      <td>10.0</td>
+      <td>13.0</td>
+      <td>0.492568</td>
+      <td>0.010502</td>
+      <td>0.482066</td>
+      <td>0.121348</td>
+      <td>0.018255</td>
+      <td>0.026759</td>
+      <td>0.051219</td>
+      <td>0.051219</td>
+      <td>0.112386</td>
+    </tr>
+    <tr>
+      <th>10</th>
+      <td>156.0</td>
+      <td>181.0</td>
+      <td>1.160256</td>
+      <td>11.538296</td>
+      <td>27.0</td>
+      <td>15.0</td>
+      <td>12.0</td>
+      <td>0.166998</td>
+      <td>0.017241</td>
+      <td>0.149757</td>
+      <td>0.100557</td>
+      <td>0.014971</td>
+      <td>0.024958</td>
+      <td>0.068430</td>
+      <td>0.068430</td>
+      <td>0.090337</td>
+    </tr>
+    <tr>
+      <th>11</th>
+      <td>155.0</td>
+      <td>223.0</td>
+      <td>1.438710</td>
+      <td>5.578718</td>
+      <td>17.0</td>
+      <td>11.0</td>
+      <td>6.0</td>
+      <td>0.169385</td>
+      <td>0.017266</td>
+      <td>0.152119</td>
+      <td>0.124592</td>
+      <td>0.018685</td>
+      <td>0.038476</td>
+      <td>0.029926</td>
+      <td>0.029926</td>
+      <td>0.192470</td>
+    </tr>
+    <tr>
+      <th>12</th>
+      <td>139.0</td>
+      <td>153.0</td>
+      <td>1.100719</td>
+      <td>9.883954</td>
+      <td>22.0</td>
+      <td>15.0</td>
+      <td>7.0</td>
+      <td>0.180822</td>
+      <td>0.010345</td>
+      <td>0.170477</td>
+      <td>0.106224</td>
+      <td>0.015952</td>
+      <td>0.020490</td>
+      <td>0.064846</td>
+      <td>0.064846</td>
+      <td>0.104404</td>
+    </tr>
+    <tr>
+      <th>13</th>
+      <td>133.0</td>
+      <td>150.0</td>
+      <td>1.127820</td>
+      <td>11.425268</td>
+      <td>32.0</td>
+      <td>10.0</td>
+      <td>22.0</td>
+      <td>0.159091</td>
+      <td>0.031847</td>
+      <td>0.127244</td>
+      <td>0.089694</td>
+      <td>0.017088</td>
+      <td>0.030395</td>
+      <td>0.079582</td>
+      <td>0.079582</td>
+      <td>0.092099</td>
+    </tr>
+    <tr>
+      <th>14</th>
+      <td>125.0</td>
+      <td>164.0</td>
+      <td>1.312000</td>
+      <td>8.039226</td>
+      <td>21.0</td>
+      <td>11.0</td>
+      <td>10.0</td>
+      <td>0.229091</td>
+      <td>0.033149</td>
+      <td>0.195942</td>
+      <td>0.106358</td>
+      <td>0.021161</td>
+      <td>0.032551</td>
+      <td>0.057229</td>
+      <td>0.057229</td>
+      <td>0.131792</td>
+    </tr>
+    <tr>
+      <th>15</th>
+      <td>106.0</td>
+      <td>114.0</td>
+      <td>1.075472</td>
+      <td>8.125966</td>
+      <td>17.0</td>
+      <td>14.0</td>
+      <td>3.0</td>
+      <td>0.118110</td>
+      <td>0.039130</td>
+      <td>0.078980</td>
+      <td>0.068643</td>
+      <td>0.020485</td>
+      <td>0.031152</td>
+      <td>0.068519</td>
+      <td>0.068519</td>
+      <td>0.126938</td>
+    </tr>
+    <tr>
+      <th>16</th>
+      <td>69.0</td>
+      <td>78.0</td>
+      <td>1.130435</td>
+      <td>6.555840</td>
+      <td>14.0</td>
+      <td>9.0</td>
+      <td>5.0</td>
+      <td>0.200957</td>
+      <td>0.032787</td>
+      <td>0.168170</td>
+      <td>0.096926</td>
+      <td>0.033248</td>
+      <td>0.051605</td>
+      <td>0.082923</td>
+      <td>0.082923</td>
+      <td>0.159225</td>
+    </tr>
+    <tr>
+      <th>17</th>
+      <td>61.0</td>
+      <td>74.0</td>
+      <td>1.213115</td>
+      <td>5.230601</td>
+      <td>13.0</td>
+      <td>11.0</td>
+      <td>2.0</td>
+      <td>0.156522</td>
+      <td>0.049451</td>
+      <td>0.107071</td>
+      <td>0.102719</td>
+      <td>0.040437</td>
+      <td>0.070094</td>
+      <td>0.071705</td>
+      <td>0.071705</td>
+      <td>0.201406</td>
+    </tr>
+    <tr>
+      <th>18</th>
+      <td>60.0</td>
+      <td>60.0</td>
+      <td>1.000000</td>
+      <td>8.976271</td>
+      <td>22.0</td>
+      <td>11.0</td>
+      <td>11.0</td>
+      <td>0.026786</td>
+      <td>0.061224</td>
+      <td>-0.034439</td>
+      <td>0.034127</td>
+      <td>0.033898</td>
+      <td>0.059709</td>
+      <td>0.137522</td>
+      <td>0.137522</td>
+      <td>0.115692</td>
+    </tr>
+    <tr>
+      <th>19</th>
+      <td>60.0</td>
+      <td>116.0</td>
+      <td>1.933333</td>
+      <td>3.951412</td>
+      <td>12.0</td>
+      <td>6.0</td>
+      <td>6.0</td>
+      <td>0.284598</td>
+      <td>0.082452</td>
+      <td>0.202146</td>
+      <td>0.233917</td>
+      <td>0.065537</td>
+      <td>0.082205</td>
+      <td>0.050886</td>
+      <td>0.050886</td>
+      <td>0.274479</td>
+    </tr>
+  </tbody>
+</table>
+</div>
+
+
 
 
 ```python
 create_plot_grid([results_df[c] for c in results_df.columns], kind='line')
 ```
+
+
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_50_0.png)
+
+
+
+```python
+temp_df = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
+temp_df['c_modularity'].value_counts()
+```
+
+
+
+
+    0.0     37
+    2.0     36
+    1.0     31
+    12.0    14
+    7.0     10
+    5.0     10
+    13.0     7
+    3.0      6
+    4.0      4
+    9.0      3
+    8.0      3
+    6.0      3
+    80.0     2
+    23.0     1
+    41.0     1
+    48.0     1
+    10.0     1
+    72.0     1
+    46.0     1
+    14.0     1
+    15.0     1
+    21.0     1
+    27.0     1
+    43.0     1
+    Name: c_modularity, dtype: int64
+
+
 
 
 ```python
