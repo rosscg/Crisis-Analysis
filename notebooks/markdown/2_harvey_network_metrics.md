@@ -45,15 +45,25 @@ Communities are labelled as numbers according to their ranking in size (where 0 
 
 
 ```python
+### Initialisation ###
+import os
 import networkx as nx
 import pandas as pd
+import matplotlib.pyplot as plt
+
+%matplotlib inline
+plt.rcParams['figure.figsize'] = [6, 4]
 
 # Location of data files
 DIR = './data/harvey_user_location/'
+GRAPH_DIR = DIR + 'graph_objs/'
+
+EVENT_NAME = Event.objects.all()[0].name.replace(' ', '')
+DF_FILENAME = 'df_users.csv'
 
 # Confirm correct database is set in Django settings.py
-if 'Harvey' not in Event.objects.all()[0].name:
-    raise Exception('Event name mismatch -- check connected database')
+if 'Harvey' not in EVENT_NAME:
+    raise Exception('Event name mismatch -- check database set in Django')
 ```
 
 
@@ -64,12 +74,10 @@ def get_graph_object():
     Imports gexf file if extant, otherwise builds from database
     and saves as gexf file.
     '''
-    EVENT_NAME = Event.objects.all()[0].name.replace(' ', '')
     FILENAME = 'network_data_{}_v1.gexf'.format(EVENT_NAME)
-    DIR = './data/harvey_user_location/'
     try:
         # Load cached file if available
-        G = nx.read_gexf(DIR + FILENAME)
+        G = nx.read_gexf(GRAPH_DIR + FILENAME)
         print('Importing existing graph object...')
     except:
         print('Creating new graph object...')
@@ -85,8 +93,8 @@ def get_graph_object():
         edge_list = [(edge.source_user.screen_name, edge.target_user.screen_name) for edge in edges]
         G.add_edges_from(edge_list)
         # Write to file and re-import to bypass unresolved issue with community algorithms
-        nx.write_gexf(G, DIR + FILENAME, prettyprint=True)
-        G = nx.read_gexf(DIR + FILENAME)
+        nx.write_gexf(G, GRAPH_DIR + FILENAME, prettyprint=True)
+        G = nx.read_gexf(GRAPH_DIR + FILENAME)
     return G
 ```
 
@@ -119,7 +127,7 @@ def calc_community_metrics(G, filename=False):
     # Load cached file if available
     if filename:
         try:
-            G = nx.read_gexf(DIR + filename)
+            G = nx.read_gexf(GRAPH_DIR + filename)
             print('Importing existing community graph object...')
             return G
         except:
@@ -178,12 +186,12 @@ def calc_community_metrics(G, filename=False):
             for name in c:
                 community_dict[name] = i
         nx.set_node_attributes(G, community_dict, key)
-    # (Louvain package returns a different format)
+    # (Louvain package returns a different format):
     nx.set_node_attributes(G, partition_sorted, 'c_louvain')
 
     if filename:
         print('Writing to file...')
-        nx.write_gexf(G, DIR + filename, prettyprint=True)
+        nx.write_gexf(G, GRAPH_DIR + filename, prettyprint=True)
         
     return G
 ```
@@ -273,9 +281,8 @@ df_comm.head()
 
 ```python
 # Open original Dataframe
-path_to_original_df = 'data/harvey_user_location/df_users.csv'
+users_df = pd.read_csv(DIR + DF_FILENAME, index_col=0)
 
-users_df = pd.read_csv(path_to_original_df, index_col=0)
 users_df.shape
 ```
 
@@ -347,11 +354,11 @@ users_df.head()
       <td>1645</td>
       <td>3</td>
       <td>0</td>
-      <td>3.0</td>
-      <td>0.0</td>
-      <td>5.0</td>
-      <td>6.0</td>
-      <td>8.0</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>1</th>
@@ -371,11 +378,11 @@ users_df.head()
       <td>1321</td>
       <td>5</td>
       <td>0</td>
-      <td>5.0</td>
-      <td>0.0</td>
-      <td>1854.0</td>
-      <td>3.0</td>
-      <td>7.0</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>2</th>
@@ -395,11 +402,11 @@ users_df.head()
       <td>1865</td>
       <td>1</td>
       <td>1</td>
-      <td>4.0</td>
-      <td>697.0</td>
-      <td>1469.0</td>
-      <td>3.0</td>
-      <td>10.0</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
+      <td>NaN</td>
     </tr>
     <tr>
       <th>3</th>
@@ -419,11 +426,11 @@ users_df.head()
       <td>2451</td>
       <td>1</td>
       <td>0</td>
-      <td>2.0</td>
       <td>0.0</td>
-      <td>0.0</td>
-      <td>7.0</td>
-      <td>6.0</td>
+      <td>31.0</td>
+      <td>20.0</td>
+      <td>5.0</td>
+      <td>5.0</td>
     </tr>
     <tr>
       <th>4</th>
@@ -492,10 +499,15 @@ import matplotlib.pyplot as plt
 plt.rcParams['figure.figsize'] = [6, 4]
 
 
-def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
+def create_plot_grid(df_list, df_list_secondary=None, titles=None, axhline=None, kind='bar'):
     '''
-    Plots a list of dataframes or series as bar charts in a 
-    single figure with two columns.
+    Plots a list of dataframes or series in a single figure 
+    with two columns.
+    
+    Plots a secondary value on a different scale if 
+    df_list_secondary is passed. Either as a matching list,
+    or list containing a single series.
+    
     Can add a horizontal line at a value provided as axhline.
     '''
 
@@ -506,26 +518,30 @@ def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
         except:
             pass
     
-    # Plot single chart without grid
+    # Plot single chart without grid:
     if len(df_list) == 1:
         if titles:
             df_list[0].plot(kind=kind, colormap='Spectral', title=titles[0], rot=45)
             #ax.set_title(titles[0])
         else:
             df_list[0].plot(kind=kind, colormap='Spectral', rot=45)
+        if not df_list_secondary == None:
+            df_list_secondary[0].plot(kind=kind, secondary_y=True, legend=True)
         return
     
+    # Create grid structure:
     ncol = 2
     nrow = int((len(df_list)+1)/2)
-    # Temporarilty increase figsize 
+    # Temporarilty increase figsize:
     plt.rcParams['figure.figsize'] = [plt.rcParams['figure.figsize'][0] * 2, 
                                       plt.rcParams['figure.figsize'][1] * nrow]
-    fig, axs = plt.subplots(nrow,ncol)
+    fig, axs = plt.subplots(nrow, ncol)
     fig.tight_layout(pad=4.0)
     # Delete last cell if odd number:
     if len(df_list) % 2 != 0:
         fig.delaxes(axs[nrow-1,1])
-        
+    
+    # Populate grid with plots:
     for r in range(nrow):
         for c in range(ncol):
             count = r*2+c
@@ -537,7 +553,14 @@ def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
                 ax = axs[c]
             else:
                 ax = axs[r,c]
+
             df_list[count].plot(kind=kind, ax=ax, colormap='Spectral', rot=45)
+            if not df_list_secondary == None:
+                try:
+                    df_list_secondary[count].plot(kind=kind, ax=ax, secondary_y=True, legend=True)
+                except: # One secondary series passed for all plots
+                    df_list_secondary[0].plot(kind=kind, ax=ax, secondary_y=True, legend=True)
+            
             if titles:
                 #ax.set_title(titles[count])
                 ax.text(.5, .9, titles[count], 
@@ -547,7 +570,7 @@ def create_plot_grid(df_list, titles=None, axhline=None, kind='bar'):
             if axhline:
                 axs[r,c].axhline(y=axhline, color='b', linestyle='dotted', lw=2)
     
-    # Reset figsize 
+    # Reset figsize:
     plt.rcParams['figure.figsize'] = [plt.rcParams['figure.figsize'][0] / 2, 
                                       plt.rcParams['figure.figsize'][1] / nrow]
     return
@@ -937,6 +960,7 @@ import warnings
 # Ignore FutureWarning from RF classifier
 warnings.simplefilter(action='ignore', category=FutureWarning)
 
+
 def get_rf_importance_df(X, y):
     '''
     Returns importances of X variables as determined by
@@ -1038,8 +1062,6 @@ def get_graph_objects_time_sliced():
     slice index, where t_n = k*24h. The dictionary will not
     include the final, complete graph.
     """
-    EVENT_NAME = Event.objects.all()[0].name.replace(' ', '')
-    DIR = './data/harvey_user_location/'
     
     # Get event and calculate duration:
     e = Event.objects.all()[0]
@@ -1062,7 +1084,7 @@ def get_graph_objects_time_sliced():
         filename = 'network_data_{}_tslice-{}.gexf'.format(EVENT_NAME, len(interim_time_slices)-i)
         try:
             # Load cached file if available
-            G = nx.read_gexf(DIR + filename)
+            G = nx.read_gexf(GRAPH_DIR + filename)
             print('Importing existing graph object for time slice {} ...'.format(i))
         except:
             print('Creating new graph object for time slice {}...'.format(i))
@@ -1083,8 +1105,8 @@ def get_graph_objects_time_sliced():
             edge_list = [(edge.source_user.screen_name, edge.target_user.screen_name) for edge in edges]
             G.add_edges_from(edge_list)
             # Write to file and re-import to bypass issue with community algorithms
-            nx.write_gexf(G, DIR + filename, prettyprint=True)
-            G = nx.read_gexf(DIR + filename)
+            nx.write_gexf(G, GRAPH_DIR + filename, prettyprint=True)
+            G = nx.read_gexf(GRAPH_DIR + filename)
             
         graph_dict[len(interim_time_slices)-i] = G
         
@@ -1107,26 +1129,50 @@ g_dict = get_graph_objects_time_sliced()
     Importing existing graph object for time slice 6 ...
 
 
+
+```python
+########################################################
+########################################################
+########################################################
+########################################################
+########################################################
+#### STOP HERE AND CHECK STATE OF users_df -- next section needn't import again and use temp, use copy instead.
+
+#raise Exception
+
+users_df.head()
+```
+
+
+    --------------------------------------
+
+    ExceptionTraceback (most recent call last)
+
+    <ipython-input-189-2ef5e6a42902> in <module>
+          1 #### STOP HERE AND CHECK STATE OF users_df -- next section needn't import again and use temp, use copy instead.
+          2 
+    ----> 3 raise Exception
+    
+
+    Exception: 
+
+
 Calculate the community metrics for each subgraph and create time slice dataframes for each metric:
 
 
 ```python
-import os
-import pandas as pd
-# Ignore FutureWarning from RF classifier
-import warnings
-warnings.simplefilter(action='ignore', category=FutureWarning)
+# import os
+# import pandas as pd
+# # Ignore FutureWarning from RF classifier
+# import warnings
+# warnings.simplefilter(action='ignore', category=FutureWarning)
 
+# users_df = pd.read_csv(DIR + DF_FILENAME, index_col=0)
 
-DIR = './data/harvey_user_location/'
-DF_FILENAME = 'df_users.csv'
-
-users_df = pd.read_csv(DIR + DF_FILENAME, index_col=0)
+# TODO: check this cell, move into function?
 
 g_dict_comm = {}
 
-
-#df_comm.columns
 tslice_chi2a_df = pd.DataFrame()
 tslice_chi2b_df = pd.DataFrame()
 tslice_cramers_df = pd.DataFrame()
@@ -1142,9 +1188,9 @@ for key in g_dict:
     g2 = g_dict[key]
     
     # Write and reimport to avoid issue with community calculation:
-    nx.write_gexf(g2, DIR + 'temp.gexf', prettyprint=True)
-    g2 = nx.read_gexf(DIR + 'temp.gexf')
-    os.remove(DIR + 'temp.gexf')
+    nx.write_gexf(g2, GRAPH_DIR + 'temp.gexf', prettyprint=True)
+    g2 = nx.read_gexf(GRAPH_DIR + 'temp.gexf')
+    os.remove(GRAPH_DIR + 'temp.gexf')
     
     # Calc community metrics for graph
     g2 = calc_community_metrics(g2, filename)
@@ -1275,7 +1321,7 @@ dff
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_35_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_36_1.png)
 
 
 
@@ -1311,7 +1357,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_38_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_39_1.png)
 
 
 
@@ -1325,7 +1371,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_39_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_40_1.png)
 
 
 
@@ -1339,7 +1385,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_40_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
 
 
 
@@ -1353,7 +1399,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
 
 
 
@@ -1367,7 +1413,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_43_1.png)
 
 
 The stability in the Theil's U and Random Forest metrics suggest that the associations are strong even in smaller graphs. Therefore using these community data throughout the collection process in live classification is a viable strategy. Theil's U measures the fraction of Y (witness labels) we can predict using the community measures. The highest and most stable over time algorithms therefore appear to be c_modularity, c_label_prop_async, and c_louvain. Each of these shows a value of approximately .20-.25 over the course of the collection period.
@@ -1392,6 +1438,13 @@ def calc_network_metrics(G):
     
     # Create undirected graph:
     G = nx.Graph(G)
+    #### TESTING ####
+    if not nx.is_connected(G):
+        print('ERROR: undirected graph not connected!')
+        print([len(x) for x in nx.connected_components(G)])
+        Gcc = max(nx.connected_components(G), key=len)
+        G = G.subgraph(Gcc)
+    #################
     n = len(G)
     
     result_dict['nodes'] = n
@@ -1467,7 +1520,7 @@ def get_network_metrics_df(subgraphs_dict, title=None):
 
     # Return cached file if available.
     if title:
-        filename = 'network_data_comm_metrics_{}.csv'.format(title)
+        filename = 'network_data_{}_comm_metrics_{}.csv'.format(EVENT_NAME, title)
         try:
             results_df = pd.read_csv(DIR + filename, index_col=0)
             print('Returning cached file...')
@@ -1479,6 +1532,10 @@ def get_network_metrics_df(subgraphs_dict, title=None):
 
     print('Total community subgraphs: ', len(subgraphs_dict))
     for k, v in subgraphs_dict.items():
+        ### TESTING ###
+        #if k != 12:
+        #    continue
+        ###############
         print('Calculating metrics for community ID: ', k)
         results = calc_network_metrics(v)    
         results_df[k] = results.values()
@@ -1522,964 +1579,157 @@ def get_subgraphs_by_attr(G, attr, min_subgraph_size=0):
 
 
 ```python
-e = Event.objects.all()[0]
-filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
+# e = Event.objects.all()[0]
+# filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
 
-G = get_graph_object()
-G = calc_community_metrics(G, filename)
+# G = get_graph_object()
+# G = calc_community_metrics(G, filename)
 ```
 
-    Importing existing graph object...
-    Importing existing community graph object...
+For now, we can focus on the most promising community algorithm labels identified above: `c_modularity`, `c_label_prop_asyn`, `c_fluid`, `c_louvain`.
 
+We exclude communities smaller than 50.
 
-For now, we focus on the `c_modularity` community labels, and exclude communities smaller than 50.
+For each algorithm we do the following:
+* The complete graph is split by the algorithm's labels, and the network metrics for each subgraph are then calculated and stored in a dataframe.
 
-The complete graph is split by the modularity labels, and the network metrics for each subgraph are then calculated and stored in a dataframe.
+* We then calculate the ratio of positive-classed 'witness' cases against the total classed cases. As coding was done at random, some communities will have very few classed cases and therefore their ratios may not be statistically significant.
+
+* Once these ratios are added to the community results dataframe, we can sort by their value and inspect the various metrics for possible relationships -- ie. which network metrics are associated with the ratio of positive cases.
 
 
 ```python
-comm_name = 'c_modularity'
-min_community_size = 50
+def get_community_metrics_df(G, comm_name, users_df, min_community_size=50):
+    
+    # Split graph by comm_name labels, and calculate network metrics per sub-graph:
+    subgraphs_dict = get_subgraphs_by_attr(G, comm_name, min_community_size)
+    results_df = get_network_metrics_df(subgraphs_dict, comm_name)
 
-#subgraphs_dict = get_subgraphs_by_attr(G, 'c_modularity', MIN_COMMUNITY_SIZE)
-subgraphs_dict = get_subgraphs_by_attr(G, comm_name, min_community_size)
+    # Calculate ratio of positive cases per community label and add to dataframe:
+    users_df_for_comm = users_df.loc[users_df[comm_name].notna() == True]
+    ratio_list = []
+    total_list = []
+    for comm_id in results_df.index:
+        tot = users_df_for_comm.loc[users_df_for_comm[comm_name] == comm_id]
+        pos = tot.loc[tot['coded_as_witness'] == 1]
+        if tot.shape[0] > 0:
+            ratio_list.append(pos.shape[0]/tot.shape[0])
+        else:
+            ratio_list.append(None)
+        total_list.append(tot.shape[0])
+    results_df['pos_ratio'] = ratio_list
+    results_df['total_coded'] = total_list
 
-results_df = get_network_metrics_df(subgraphs_dict, comm_name)
+    # Sort dataframe by pos_ratio (high to low)
+    results_df = results_df.sort_values(by=['pos_ratio'], ascending=False).reset_index()
+    results_df.rename(columns={'index': 'size_rank'}, inplace=True)
 
-results_df.head()
+    return results_df
 ```
 
-    Total subgraphs:  20
-    Calculating metrics for community ID:  0
-    Calculating metrics for community ID:  1
-    Calculating metrics for community ID:  2
-    Calculating metrics for community ID:  3
-    Calculating metrics for community ID:  4
-    Calculating metrics for community ID:  5
-    Calculating metrics for community ID:  6
-    Calculating metrics for community ID:  7
-    Calculating metrics for community ID:  8
-    Calculating metrics for community ID:  9
-    Calculating metrics for community ID:  10
-    Calculating metrics for community ID:  11
-    Calculating metrics for community ID:  12
-    Calculating metrics for community ID:  13
-    Calculating metrics for community ID:  14
-    Calculating metrics for community ID:  15
-    Calculating metrics for community ID:  16
-    Calculating metrics for community ID:  17
-    Calculating metrics for community ID:  18
-    Calculating metrics for community ID:  19
+
+```python
+#comm_names = ['c_modularity', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
+comm_names = ['c_label_prop_asyn']
+
+for comm_name in comm_names:
+    results_df = get_community_metrics_df(G, comm_name, users_df)
+    
+    #df_list = [results_df[[c]] for c in results_df.columns]
+    #df_list_secondary = [results_df['pos_ratio']]
+    #create_plot_grid(df_list, df_list_secondary, kind='line')
+    
+    # Trim by size of community and amount of cases coded within each:
+    #min_community_size = 1000
+    min_community_size = 0
+    min_total_coded = 0
+
+    results_sub_df = results_df.loc[
+                                (results_df['nodes'] >= min_community_size) & 
+                                (results_df['total_coded'] >= min_total_coded)
+                                    ].reset_index(drop=True)
+    
+    df_list = [results_sub_df[[c]] for c in results_sub_df.columns]
+    df_list_secondary = [results_sub_df['pos_ratio']]
+    #create_plot_grid(df_list, df_list_secondary, kind='line')
+```
+
+    Returning cached file...
+
+
+
+```python
+# TODO:
+# Why is there so few total_coded within the communities -- should be closer to 1500?
+sum(results_sub_df['total_coded'])
+```
 
 
 
 
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>nodes</th>
-      <th>edges</th>
-      <th>avg_degree</th>
-      <th>avg_shortest_path_length</th>
-      <th>diameter</th>
-      <th>ex_diameter</th>
-      <th>diameter_diff</th>
-      <th>transitivity</th>
-      <th>ex_transitivity</th>
-      <th>transitivity_diff</th>
-      <th>avg_clustering</th>
-      <th>avg_degree_centrality</th>
-      <th>avg_eigenvector_centrality</th>
-      <th>avg_betweenness_centrality</th>
-      <th>avg_load_centrality</th>
-      <th>avg_closeness_centrality</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>3889.0</td>
-      <td>25199.0</td>
-      <td>6.479558</td>
-      <td>3.639366</td>
-      <td>8.0</td>
-      <td>5.0</td>
-      <td>3.0</td>
-      <td>0.136930</td>
-      <td>0.003144</td>
-      <td>0.133786</td>
-      <td>0.180881</td>
-      <td>0.003333</td>
-      <td>0.007359</td>
-      <td>0.000679</td>
-      <td>0.000679</td>
-      <td>0.279271</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>3561.0</td>
-      <td>15914.0</td>
-      <td>4.468969</td>
-      <td>4.393341</td>
-      <td>11.0</td>
-      <td>7.0</td>
-      <td>4.0</td>
-      <td>0.188485</td>
-      <td>0.002732</td>
-      <td>0.185753</td>
-      <td>0.176010</td>
-      <td>0.002511</td>
-      <td>0.004862</td>
-      <td>0.000953</td>
-      <td>0.000953</td>
-      <td>0.232554</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>3287.0</td>
-      <td>6635.0</td>
-      <td>2.018558</td>
-      <td>5.930651</td>
-      <td>14.0</td>
-      <td>13.0</td>
-      <td>1.0</td>
-      <td>0.127956</td>
-      <td>0.001022</td>
-      <td>0.126934</td>
-      <td>0.061256</td>
-      <td>0.001229</td>
-      <td>0.003808</td>
-      <td>0.001501</td>
-      <td>0.001501</td>
-      <td>0.172470</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>2409.0</td>
-      <td>6542.0</td>
-      <td>2.715650</td>
-      <td>4.997184</td>
-      <td>13.0</td>
-      <td>10.0</td>
-      <td>3.0</td>
-      <td>0.134199</td>
-      <td>0.001555</td>
-      <td>0.132644</td>
-      <td>0.133748</td>
-      <td>0.002256</td>
-      <td>0.006513</td>
-      <td>0.001661</td>
-      <td>0.001661</td>
-      <td>0.205649</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>1205.0</td>
-      <td>2018.0</td>
-      <td>1.674689</td>
-      <td>6.972231</td>
-      <td>18.0</td>
-      <td>13.0</td>
-      <td>5.0</td>
-      <td>0.219641</td>
-      <td>0.001384</td>
-      <td>0.218257</td>
-      <td>0.105341</td>
-      <td>0.002782</td>
-      <td>0.006279</td>
-      <td>0.004964</td>
-      <td>0.004964</td>
-      <td>0.147765</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>956.0</td>
-      <td>1273.0</td>
-      <td>1.331590</td>
-      <td>7.723490</td>
-      <td>20.0</td>
-      <td>17.0</td>
-      <td>3.0</td>
-      <td>0.142832</td>
-      <td>0.000828</td>
-      <td>0.142004</td>
-      <td>0.101710</td>
-      <td>0.002789</td>
-      <td>0.006074</td>
-      <td>0.007048</td>
-      <td>0.007048</td>
-      <td>0.133699</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>242.0</td>
-      <td>280.0</td>
-      <td>1.157025</td>
-      <td>12.790885</td>
-      <td>35.0</td>
-      <td>14.0</td>
-      <td>21.0</td>
-      <td>0.161379</td>
-      <td>0.000000</td>
-      <td>0.161379</td>
-      <td>0.106915</td>
-      <td>0.009602</td>
-      <td>0.014630</td>
-      <td>0.049129</td>
-      <td>0.049129</td>
-      <td>0.082649</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>180.0</td>
-      <td>233.0</td>
-      <td>1.294444</td>
-      <td>7.580881</td>
-      <td>21.0</td>
-      <td>10.0</td>
-      <td>11.0</td>
-      <td>0.192440</td>
-      <td>0.016575</td>
-      <td>0.175865</td>
-      <td>0.143187</td>
-      <td>0.014463</td>
-      <td>0.031622</td>
-      <td>0.036971</td>
-      <td>0.036971</td>
-      <td>0.138699</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>166.0</td>
-      <td>194.0</td>
-      <td>1.168675</td>
-      <td>8.371376</td>
-      <td>18.0</td>
-      <td>14.0</td>
-      <td>4.0</td>
-      <td>0.278409</td>
-      <td>0.000000</td>
-      <td>0.278409</td>
-      <td>0.083104</td>
-      <td>0.014166</td>
-      <td>0.020026</td>
-      <td>0.044947</td>
-      <td>0.044947</td>
-      <td>0.124707</td>
-    </tr>
-    <tr>
-      <th>9</th>
-      <td>166.0</td>
-      <td>250.0</td>
-      <td>1.506024</td>
-      <td>9.399854</td>
-      <td>23.0</td>
-      <td>10.0</td>
-      <td>13.0</td>
-      <td>0.492568</td>
-      <td>0.010502</td>
-      <td>0.482066</td>
-      <td>0.121348</td>
-      <td>0.018255</td>
-      <td>0.026759</td>
-      <td>0.051219</td>
-      <td>0.051219</td>
-      <td>0.112386</td>
-    </tr>
-    <tr>
-      <th>10</th>
-      <td>156.0</td>
-      <td>181.0</td>
-      <td>1.160256</td>
-      <td>11.538296</td>
-      <td>27.0</td>
-      <td>15.0</td>
-      <td>12.0</td>
-      <td>0.166998</td>
-      <td>0.017241</td>
-      <td>0.149757</td>
-      <td>0.100557</td>
-      <td>0.014971</td>
-      <td>0.024958</td>
-      <td>0.068430</td>
-      <td>0.068430</td>
-      <td>0.090337</td>
-    </tr>
-    <tr>
-      <th>11</th>
-      <td>155.0</td>
-      <td>223.0</td>
-      <td>1.438710</td>
-      <td>5.578718</td>
-      <td>17.0</td>
-      <td>11.0</td>
-      <td>6.0</td>
-      <td>0.169385</td>
-      <td>0.017266</td>
-      <td>0.152119</td>
-      <td>0.124592</td>
-      <td>0.018685</td>
-      <td>0.038476</td>
-      <td>0.029926</td>
-      <td>0.029926</td>
-      <td>0.192470</td>
-    </tr>
-    <tr>
-      <th>12</th>
-      <td>139.0</td>
-      <td>153.0</td>
-      <td>1.100719</td>
-      <td>9.883954</td>
-      <td>22.0</td>
-      <td>15.0</td>
-      <td>7.0</td>
-      <td>0.180822</td>
-      <td>0.010345</td>
-      <td>0.170477</td>
-      <td>0.106224</td>
-      <td>0.015952</td>
-      <td>0.020490</td>
-      <td>0.064846</td>
-      <td>0.064846</td>
-      <td>0.104404</td>
-    </tr>
-    <tr>
-      <th>13</th>
-      <td>133.0</td>
-      <td>150.0</td>
-      <td>1.127820</td>
-      <td>11.425268</td>
-      <td>32.0</td>
-      <td>10.0</td>
-      <td>22.0</td>
-      <td>0.159091</td>
-      <td>0.031847</td>
-      <td>0.127244</td>
-      <td>0.089694</td>
-      <td>0.017088</td>
-      <td>0.030395</td>
-      <td>0.079582</td>
-      <td>0.079582</td>
-      <td>0.092099</td>
-    </tr>
-    <tr>
-      <th>14</th>
-      <td>125.0</td>
-      <td>164.0</td>
-      <td>1.312000</td>
-      <td>8.039226</td>
-      <td>21.0</td>
-      <td>11.0</td>
-      <td>10.0</td>
-      <td>0.229091</td>
-      <td>0.033149</td>
-      <td>0.195942</td>
-      <td>0.106358</td>
-      <td>0.021161</td>
-      <td>0.032551</td>
-      <td>0.057229</td>
-      <td>0.057229</td>
-      <td>0.131792</td>
-    </tr>
-    <tr>
-      <th>15</th>
-      <td>106.0</td>
-      <td>114.0</td>
-      <td>1.075472</td>
-      <td>8.125966</td>
-      <td>17.0</td>
-      <td>14.0</td>
-      <td>3.0</td>
-      <td>0.118110</td>
-      <td>0.039130</td>
-      <td>0.078980</td>
-      <td>0.068643</td>
-      <td>0.020485</td>
-      <td>0.031152</td>
-      <td>0.068519</td>
-      <td>0.068519</td>
-      <td>0.126938</td>
-    </tr>
-    <tr>
-      <th>16</th>
-      <td>69.0</td>
-      <td>78.0</td>
-      <td>1.130435</td>
-      <td>6.555840</td>
-      <td>14.0</td>
-      <td>9.0</td>
-      <td>5.0</td>
-      <td>0.200957</td>
-      <td>0.032787</td>
-      <td>0.168170</td>
-      <td>0.096926</td>
-      <td>0.033248</td>
-      <td>0.051605</td>
-      <td>0.082923</td>
-      <td>0.082923</td>
-      <td>0.159225</td>
-    </tr>
-    <tr>
-      <th>17</th>
-      <td>61.0</td>
-      <td>74.0</td>
-      <td>1.213115</td>
-      <td>5.230601</td>
-      <td>13.0</td>
-      <td>11.0</td>
-      <td>2.0</td>
-      <td>0.156522</td>
-      <td>0.049451</td>
-      <td>0.107071</td>
-      <td>0.102719</td>
-      <td>0.040437</td>
-      <td>0.070094</td>
-      <td>0.071705</td>
-      <td>0.071705</td>
-      <td>0.201406</td>
-    </tr>
-    <tr>
-      <th>18</th>
-      <td>60.0</td>
-      <td>60.0</td>
-      <td>1.000000</td>
-      <td>8.976271</td>
-      <td>22.0</td>
-      <td>11.0</td>
-      <td>11.0</td>
-      <td>0.026786</td>
-      <td>0.061224</td>
-      <td>-0.034439</td>
-      <td>0.034127</td>
-      <td>0.033898</td>
-      <td>0.059709</td>
-      <td>0.137522</td>
-      <td>0.137522</td>
-      <td>0.115692</td>
-    </tr>
-    <tr>
-      <th>19</th>
-      <td>60.0</td>
-      <td>116.0</td>
-      <td>1.933333</td>
-      <td>3.951412</td>
-      <td>12.0</td>
-      <td>6.0</td>
-      <td>6.0</td>
-      <td>0.284598</td>
-      <td>0.082452</td>
-      <td>0.202146</td>
-      <td>0.233917</td>
-      <td>0.065537</td>
-      <td>0.082205</td>
-      <td>0.050886</td>
-      <td>0.050886</td>
-      <td>0.274479</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+    113
 
 
 
 
 ```python
-# Calculate ratio of positive cases per community label:
-
-tot = temp_df.loc[temp_df['c_modularity'].notna() == True]
-
-ratio_list = []
-
-for comm in results_df.index:
-    tot2 = tot.loc[tot['c_modularity'] == comm]
-    pos = tot2.loc[tot2['coded_as_witness'] == 1]
-    if tot2.shape[0] > 0:
-        ratio_list.append(pos.shape[0]/tot2.shape[0])
-    else:
-        ratio_list.append(None)
-
-
-results_df['pos_ratio'] = ratio_list
+create_plot_grid(df_list, df_list_secondary, kind='line')
 ```
 
 
-```python
-# Sort dataframe by pos_ratio (high to low)
-tdf = results_df.sort_values(by=['pos_ratio'], ascending=False).reset_index()
-tdf.rename(columns={'index': 'size_rank'}, inplace=True)
-
-create_plot_grid([tdf[[c]] for c in tdf.columns], kind='line')
-
-# TODO: try excluding smaller communities, or smaller coded amounts
-```
-
-
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_51_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_53_0.png)
 
 
 
 ```python
-tdf
+# Stop running here
+
+raise Exception
+```
+
+### Visual Inspection
+
+
+```python
+df_list = [results_df[[c]] for c in results_df.columns]
+df_list_secondary = [results_df['pos_ratio']]
+
+create_plot_grid(df_list, df_list_secondary, kind='line')
 ```
 
 
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_56_0.png)
 
 
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>size_rank</th>
-      <th>nodes</th>
-      <th>edges</th>
-      <th>avg_degree</th>
-      <th>avg_shortest_path_length</th>
-      <th>diameter</th>
-      <th>ex_diameter</th>
-      <th>diameter_diff</th>
-      <th>transitivity</th>
-      <th>ex_transitivity</th>
-      <th>transitivity_diff</th>
-      <th>avg_clustering</th>
-      <th>avg_degree_centrality</th>
-      <th>avg_eigenvector_centrality</th>
-      <th>avg_betweenness_centrality</th>
-      <th>avg_load_centrality</th>
-      <th>avg_closeness_centrality</th>
-      <th>pos_ratio</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>13</td>
-      <td>133.0</td>
-      <td>150.0</td>
-      <td>1.127820</td>
-      <td>11.425268</td>
-      <td>32.0</td>
-      <td>10.0</td>
-      <td>22.0</td>
-      <td>0.159091</td>
-      <td>0.031847</td>
-      <td>0.127244</td>
-      <td>0.089694</td>
-      <td>0.017088</td>
-      <td>0.030395</td>
-      <td>0.079582</td>
-      <td>0.079582</td>
-      <td>0.092099</td>
-      <td>0.857143</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>2</td>
-      <td>3287.0</td>
-      <td>6635.0</td>
-      <td>2.018558</td>
-      <td>5.930651</td>
-      <td>14.0</td>
-      <td>13.0</td>
-      <td>1.0</td>
-      <td>0.127956</td>
-      <td>0.001022</td>
-      <td>0.126934</td>
-      <td>0.061256</td>
-      <td>0.001229</td>
-      <td>0.003808</td>
-      <td>0.001501</td>
-      <td>0.001501</td>
-      <td>0.172470</td>
-      <td>0.750000</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>7</td>
-      <td>180.0</td>
-      <td>233.0</td>
-      <td>1.294444</td>
-      <td>7.580881</td>
-      <td>21.0</td>
-      <td>10.0</td>
-      <td>11.0</td>
-      <td>0.192440</td>
-      <td>0.016575</td>
-      <td>0.175865</td>
-      <td>0.143187</td>
-      <td>0.014463</td>
-      <td>0.031622</td>
-      <td>0.036971</td>
-      <td>0.036971</td>
-      <td>0.138699</td>
-      <td>0.700000</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>9</td>
-      <td>166.0</td>
-      <td>250.0</td>
-      <td>1.506024</td>
-      <td>9.399854</td>
-      <td>23.0</td>
-      <td>10.0</td>
-      <td>13.0</td>
-      <td>0.492568</td>
-      <td>0.010502</td>
-      <td>0.482066</td>
-      <td>0.121348</td>
-      <td>0.018255</td>
-      <td>0.026759</td>
-      <td>0.051219</td>
-      <td>0.051219</td>
-      <td>0.112386</td>
-      <td>0.666667</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>0</td>
-      <td>3889.0</td>
-      <td>25199.0</td>
-      <td>6.479558</td>
-      <td>3.639366</td>
-      <td>8.0</td>
-      <td>5.0</td>
-      <td>3.0</td>
-      <td>0.136930</td>
-      <td>0.003144</td>
-      <td>0.133786</td>
-      <td>0.180881</td>
-      <td>0.003333</td>
-      <td>0.007359</td>
-      <td>0.000679</td>
-      <td>0.000679</td>
-      <td>0.279271</td>
-      <td>0.594595</td>
-    </tr>
-    <tr>
-      <th>5</th>
-      <td>4</td>
-      <td>1205.0</td>
-      <td>2018.0</td>
-      <td>1.674689</td>
-      <td>6.972231</td>
-      <td>18.0</td>
-      <td>13.0</td>
-      <td>5.0</td>
-      <td>0.219641</td>
-      <td>0.001384</td>
-      <td>0.218257</td>
-      <td>0.105341</td>
-      <td>0.002782</td>
-      <td>0.006279</td>
-      <td>0.004964</td>
-      <td>0.004964</td>
-      <td>0.147765</td>
-      <td>0.500000</td>
-    </tr>
-    <tr>
-      <th>6</th>
-      <td>6</td>
-      <td>242.0</td>
-      <td>280.0</td>
-      <td>1.157025</td>
-      <td>12.790885</td>
-      <td>35.0</td>
-      <td>14.0</td>
-      <td>21.0</td>
-      <td>0.161379</td>
-      <td>0.000000</td>
-      <td>0.161379</td>
-      <td>0.106915</td>
-      <td>0.009602</td>
-      <td>0.014630</td>
-      <td>0.049129</td>
-      <td>0.049129</td>
-      <td>0.082649</td>
-      <td>0.333333</td>
-    </tr>
-    <tr>
-      <th>7</th>
-      <td>5</td>
-      <td>956.0</td>
-      <td>1273.0</td>
-      <td>1.331590</td>
-      <td>7.723490</td>
-      <td>20.0</td>
-      <td>17.0</td>
-      <td>3.0</td>
-      <td>0.142832</td>
-      <td>0.000828</td>
-      <td>0.142004</td>
-      <td>0.101710</td>
-      <td>0.002789</td>
-      <td>0.006074</td>
-      <td>0.007048</td>
-      <td>0.007048</td>
-      <td>0.133699</td>
-      <td>0.300000</td>
-    </tr>
-    <tr>
-      <th>8</th>
-      <td>1</td>
-      <td>3561.0</td>
-      <td>15914.0</td>
-      <td>4.468969</td>
-      <td>4.393341</td>
-      <td>11.0</td>
-      <td>7.0</td>
-      <td>4.0</td>
-      <td>0.188485</td>
-      <td>0.002732</td>
-      <td>0.185753</td>
-      <td>0.176010</td>
-      <td>0.002511</td>
-      <td>0.004862</td>
-      <td>0.000953</td>
-      <td>0.000953</td>
-      <td>0.232554</td>
-      <td>0.258065</td>
-    </tr>
-    <tr>
-      <th>9</th>
-      <td>3</td>
-      <td>2409.0</td>
-      <td>6542.0</td>
-      <td>2.715650</td>
-      <td>4.997184</td>
-      <td>13.0</td>
-      <td>10.0</td>
-      <td>3.0</td>
-      <td>0.134199</td>
-      <td>0.001555</td>
-      <td>0.132644</td>
-      <td>0.133748</td>
-      <td>0.002256</td>
-      <td>0.006513</td>
-      <td>0.001661</td>
-      <td>0.001661</td>
-      <td>0.205649</td>
-      <td>0.166667</td>
-    </tr>
-    <tr>
-      <th>10</th>
-      <td>12</td>
-      <td>139.0</td>
-      <td>153.0</td>
-      <td>1.100719</td>
-      <td>9.883954</td>
-      <td>22.0</td>
-      <td>15.0</td>
-      <td>7.0</td>
-      <td>0.180822</td>
-      <td>0.010345</td>
-      <td>0.170477</td>
-      <td>0.106224</td>
-      <td>0.015952</td>
-      <td>0.020490</td>
-      <td>0.064846</td>
-      <td>0.064846</td>
-      <td>0.104404</td>
-      <td>0.071429</td>
-    </tr>
-    <tr>
-      <th>11</th>
-      <td>8</td>
-      <td>166.0</td>
-      <td>194.0</td>
-      <td>1.168675</td>
-      <td>8.371376</td>
-      <td>18.0</td>
-      <td>14.0</td>
-      <td>4.0</td>
-      <td>0.278409</td>
-      <td>0.000000</td>
-      <td>0.278409</td>
-      <td>0.083104</td>
-      <td>0.014166</td>
-      <td>0.020026</td>
-      <td>0.044947</td>
-      <td>0.044947</td>
-      <td>0.124707</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <th>12</th>
-      <td>10</td>
-      <td>156.0</td>
-      <td>181.0</td>
-      <td>1.160256</td>
-      <td>11.538296</td>
-      <td>27.0</td>
-      <td>15.0</td>
-      <td>12.0</td>
-      <td>0.166998</td>
-      <td>0.017241</td>
-      <td>0.149757</td>
-      <td>0.100557</td>
-      <td>0.014971</td>
-      <td>0.024958</td>
-      <td>0.068430</td>
-      <td>0.068430</td>
-      <td>0.090337</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <th>13</th>
-      <td>14</td>
-      <td>125.0</td>
-      <td>164.0</td>
-      <td>1.312000</td>
-      <td>8.039226</td>
-      <td>21.0</td>
-      <td>11.0</td>
-      <td>10.0</td>
-      <td>0.229091</td>
-      <td>0.033149</td>
-      <td>0.195942</td>
-      <td>0.106358</td>
-      <td>0.021161</td>
-      <td>0.032551</td>
-      <td>0.057229</td>
-      <td>0.057229</td>
-      <td>0.131792</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <th>14</th>
-      <td>15</td>
-      <td>106.0</td>
-      <td>114.0</td>
-      <td>1.075472</td>
-      <td>8.125966</td>
-      <td>17.0</td>
-      <td>14.0</td>
-      <td>3.0</td>
-      <td>0.118110</td>
-      <td>0.039130</td>
-      <td>0.078980</td>
-      <td>0.068643</td>
-      <td>0.020485</td>
-      <td>0.031152</td>
-      <td>0.068519</td>
-      <td>0.068519</td>
-      <td>0.126938</td>
-      <td>0.000000</td>
-    </tr>
-    <tr>
-      <th>15</th>
-      <td>11</td>
-      <td>155.0</td>
-      <td>223.0</td>
-      <td>1.438710</td>
-      <td>5.578718</td>
-      <td>17.0</td>
-      <td>11.0</td>
-      <td>6.0</td>
-      <td>0.169385</td>
-      <td>0.017266</td>
-      <td>0.152119</td>
-      <td>0.124592</td>
-      <td>0.018685</td>
-      <td>0.038476</td>
-      <td>0.029926</td>
-      <td>0.029926</td>
-      <td>0.192470</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>16</th>
-      <td>16</td>
-      <td>69.0</td>
-      <td>78.0</td>
-      <td>1.130435</td>
-      <td>6.555840</td>
-      <td>14.0</td>
-      <td>9.0</td>
-      <td>5.0</td>
-      <td>0.200957</td>
-      <td>0.032787</td>
-      <td>0.168170</td>
-      <td>0.096926</td>
-      <td>0.033248</td>
-      <td>0.051605</td>
-      <td>0.082923</td>
-      <td>0.082923</td>
-      <td>0.159225</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>17</th>
-      <td>17</td>
-      <td>61.0</td>
-      <td>74.0</td>
-      <td>1.213115</td>
-      <td>5.230601</td>
-      <td>13.0</td>
-      <td>11.0</td>
-      <td>2.0</td>
-      <td>0.156522</td>
-      <td>0.049451</td>
-      <td>0.107071</td>
-      <td>0.102719</td>
-      <td>0.040437</td>
-      <td>0.070094</td>
-      <td>0.071705</td>
-      <td>0.071705</td>
-      <td>0.201406</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>18</th>
-      <td>18</td>
-      <td>60.0</td>
-      <td>60.0</td>
-      <td>1.000000</td>
-      <td>8.976271</td>
-      <td>22.0</td>
-      <td>11.0</td>
-      <td>11.0</td>
-      <td>0.026786</td>
-      <td>0.061224</td>
-      <td>-0.034439</td>
-      <td>0.034127</td>
-      <td>0.033898</td>
-      <td>0.059709</td>
-      <td>0.137522</td>
-      <td>0.137522</td>
-      <td>0.115692</td>
-      <td>NaN</td>
-    </tr>
-    <tr>
-      <th>19</th>
-      <td>19</td>
-      <td>60.0</td>
-      <td>116.0</td>
-      <td>1.933333</td>
-      <td>3.951412</td>
-      <td>12.0</td>
-      <td>6.0</td>
-      <td>6.0</td>
-      <td>0.284598</td>
-      <td>0.082452</td>
-      <td>0.202146</td>
-      <td>0.233917</td>
-      <td>0.065537</td>
-      <td>0.082205</td>
-      <td>0.050886</td>
-      <td>0.050886</td>
-      <td>0.274479</td>
-      <td>NaN</td>
-    </tr>
-  </tbody>
-</table>
-</div>
+While there appears to be regular patterns in the data above, we must remember that many of the calculated metrics are influcenced by the size of the graph. As the size also influences the amount of coded examples within the graph, we cannot interpret these results meaningfully. For example, the four smallest graphs have ~60 nodes and no coded cases. Three graphs have zero positive cases, but only a single negative code, which isn't statistically significant. Therefore, we can drop communities below a certain size and re-examine the relationships.
+
+As the network strutures appear as the size of the network grows, we can also exlude communities below a certain size:
 
 
+```python
+min_community_size = 1000
+min_total_coded = 0
+
+temp_df = tdf.loc[(tdf['nodes'] >= min_community_size) & (tdf['total_coded'] >= min_total_coded)].reset_index(drop=True)
+df_list = [temp_df[[c]] for c in tdf.columns]
+df_list_secondary = [temp_df[['pos_ratio']] for x in range(len(df_list))]
+
+create_plot_grid(df_list, df_list_secondary, kind='line')
+```
+
+
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_58_0.png)
+
+
+
+```python
+
+```
+
+
+```python
+temp_df
+```
 
 
 ```python
