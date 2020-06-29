@@ -78,9 +78,9 @@ def get_graph_object():
     try:
         # Load cached file if available
         G = nx.read_gexf(GRAPH_DIR + FILENAME)
-        print('Importing existing graph object...')
+        #print('Importing existing graph object...')
     except:
-        print('Creating new graph object...')
+        print('Creating new graph object from database...')
         classed_users = User.objects.filter(user_class__gte=1)
         edges = Relo.objects.filter(target_user__in=classed_users, source_user__in=classed_users, end_observed_at=None)
         G=nx.DiGraph()
@@ -128,7 +128,7 @@ def calc_community_metrics(G, filename=False):
     if filename:
         try:
             G = nx.read_gexf(GRAPH_DIR + filename)
-            print('Importing existing community graph object...')
+            #print('Importing existing community graph object...')
             return G
         except:
             pass
@@ -207,13 +207,21 @@ G = calc_community_metrics(G, filename)
 # Create datagrame from graph node attributes
 nodes = G.nodes(data=True)
 df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
-df_comm = df_comm.drop(['user_class', 'user_code', 'label'], axis=1)
+df_comm.drop(['user_class', 'user_code', 'label'], axis=1, inplace=True)
 #df_comm = df_comm.reset_index(drop=True)
 df_comm.head()
 ```
 
-    Importing existing graph object...
-    Importing existing community graph object...
+    Creating new graph object from database...
+    Calculating community metrics for graph. 31931 nodes and 101096 edges...
+    Largest component has 18409 nodes and 76341 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
 
 
 
@@ -236,40 +244,40 @@ df_comm.head()
       <th>0044Tamil</th>
       <td>2</td>
       <td>4</td>
-      <td>885</td>
-      <td>7</td>
-      <td>9</td>
+      <td>0</td>
+      <td>2</td>
+      <td>6</td>
     </tr>
     <tr>
       <th>007rogerbmoore</th>
       <td>3</td>
       <td>0</td>
-      <td>955</td>
-      <td>7</td>
       <td>0</td>
+      <td>4</td>
+      <td>5</td>
     </tr>
     <tr>
       <th>01fmoreira</th>
       <td>3</td>
       <td>0</td>
       <td>0</td>
-      <td>7</td>
-      <td>6</td>
+      <td>5</td>
+      <td>1</td>
     </tr>
     <tr>
       <th>0KTOBR</th>
       <td>5</td>
       <td>2</td>
-      <td>3</td>
+      <td>0</td>
       <td>1</td>
-      <td>3</td>
+      <td>0</td>
     </tr>
     <tr>
       <th>0x41_0x48</th>
       <td>241</td>
       <td>885</td>
-      <td>106</td>
-      <td>6</td>
+      <td>816</td>
+      <td>1</td>
       <td>0</td>
     </tr>
   </tbody>
@@ -282,7 +290,6 @@ df_comm.head()
 ```python
 # Open original Dataframe
 users_df = pd.read_csv(DIR + DF_FILENAME, index_col=0)
-
 users_df.shape
 ```
 
@@ -354,11 +361,11 @@ users_df.head()
       <td>1645</td>
       <td>3</td>
       <td>0</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>3.0</td>
+      <td>0.0</td>
+      <td>3.0</td>
+      <td>4.0</td>
+      <td>5.0</td>
     </tr>
     <tr>
       <th>1</th>
@@ -378,11 +385,11 @@ users_df.head()
       <td>1321</td>
       <td>5</td>
       <td>0</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>5.0</td>
+      <td>0.0</td>
+      <td>1368.0</td>
+      <td>3.0</td>
+      <td>4.0</td>
     </tr>
     <tr>
       <th>2</th>
@@ -402,11 +409,11 @@ users_df.head()
       <td>1865</td>
       <td>1</td>
       <td>1</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
+      <td>4.0</td>
+      <td>697.0</td>
+      <td>1054.0</td>
+      <td>3.0</td>
+      <td>9.0</td>
     </tr>
     <tr>
       <th>3</th>
@@ -426,11 +433,11 @@ users_df.head()
       <td>2451</td>
       <td>1</td>
       <td>0</td>
+      <td>2.0</td>
       <td>0.0</td>
-      <td>31.0</td>
-      <td>20.0</td>
+      <td>0.0</td>
       <td>5.0</td>
-      <td>5.0</td>
+      <td>1.0</td>
     </tr>
     <tr>
       <th>4</th>
@@ -463,6 +470,61 @@ users_df.head()
 
 
 
+### Giant Component Comparison
+Community detection is applied only to the largest component within the graph. This is a limitation of some of the algorithms and is used for all cases for consistency. Coded users which are not part of this largest sub-graph are not assigned a community label. The subgraphs which are not the largest component may isolated nodes or graphs too small to be worth evaulating, or there could be a single second subgraph containing 49% of the nodes. In the latter case, we would need to consider evaluating the strucutre of this graph too. We can check the proportion of nodes within the giant component, the size of the secondary components, and whether non-witness nodes are more likely to be unconnected to the giant component:
+
+
+```python
+u_label =  sum(users_df[comm_cols[0]].value_counts())
+#u_nolabel =  sum(users_df[comm_cols[0]].isna())
+print('{} of {} ({:.1f}%) coded users are part of the giant component and therefore have community labels.'
+          .format(u_label, users_df.shape[0], u_label/users_df.shape[0]*100))
+
+u_label_pos = sum(users_df.loc[users_df['coded_as_witness'] == 1][comm_cols[0]].value_counts())
+u_total_pos = users_df.loc[users_df['coded_as_witness'] == 1].shape[0]
+print('{} of {} ({:.1f}%) positively coded users are part of the giant component.'
+          .format(u_label_pos, u_total_pos, u_label_pos/u_total_pos*100))
+
+u_label_neg = sum(users_df.loc[users_df['coded_as_witness'] == 0][comm_cols[0]].value_counts())
+u_total_neg = users_df.loc[users_df['coded_as_witness'] == 0].shape[0]
+print('{} of {} ({:.1f}%) negatively coded users are part of the giant component.'
+          .format(u_label_neg, u_total_neg, u_label_neg/u_total_neg*100))
+
+print('Difference in positive and negative proportions: {:.1f}%'.format((u_label_pos/u_total_pos-u_label_neg/u_total_neg)*100))
+
+
+G_temp = get_graph_object()
+H = nx.Graph(G_temp)
+Hcc = max(nx.connected_components(H), key=len)
+H0 = H.subgraph(Hcc)
+print('\n{} of {} ({:.1f}%) nodes are part of the giant component and therefore have community labels.'
+          .format(len(H0), len(G_temp), len(H0)/len(G_temp)*100))
+print('{} of {} ({:.1f}%) edges are part of the giant component.'
+          .format(H0.number_of_edges(), G_temp.number_of_edges(), H0.number_of_edges()/G_temp.number_of_edges()*100))
+
+
+cc_lens = sorted([len(x) for x in nx.connected_components(H)], reverse=True)
+print('\nThe second largest component has {} nodes. {:.2f}% of giant component.'.format(cc_lens[1], cc_lens[1]/cc_lens[0]*100))
+
+u_label = u_label_pos = u_total_pos = u_label_neg = u_total_neg = G_temp = H = Hcc = H0 = None
+
+```
+
+    903 of 1500 (60.2%) coded users are part of the giant component and therefore have community labels.
+    285 of 386 (73.8%) positively coded users are part of the giant component.
+    618 of 1114 (55.5%) negatively coded users are part of the giant component.
+    Difference in positive and negative proportions: 18.4%
+    
+    18409 of 31931 (57.7%) nodes are part of the giant component and therefore have community labels.
+    76341 of 101096 (75.5%) edges are part of the giant component.
+    
+    The second largest component has 10 nodes. 0.05% of giant component.
+
+
+Here we can see that the giant component encapsulates 58% of the total nodes, and 60% of the classed nodes. Community detection labels are therefore not applied to 597 of the classed nodes. Positive-classed nodes are more likely to be within the giant component (74% compared to 56%), which aligns with our hypothesis that witness nodes form communities together. Therefore, whether a node is not in the giant component (and therefore has no community label) is a useful observation, in addition to the labels and metrics calculated for  the nodes within the component.
+
+As the second-largest component consists of only 10 nodes, we can safely ignore the structure of these disconnected subgraphs and effectively consider all nodes outside of the giant component as equally disconnected: essentially giving them a common community label: `-1`.
+
 ## Evaluating Community Metrics
 
 Some algorithms create many small communities of 1-10 members, which will not be useful in generalisation of the model. Therefore discarding these is useful.
@@ -471,15 +533,15 @@ Chi-square tests are typically recommended to require contingency tables with va
 
 
 ```python
-import numpy as np
-    
-# Ignore small communities where observed cases are too low (required for chi-square tests)
-MIN_COMMUNITY_SIZE = 10
+# # Ignore small communities where observed cases are too low (required for chi-square tests)
+# # This is now handled instead in the chi-sq function's implementation
+# MIN_COMMUNITY_SIZE = 10
 
-for col in comm_cols:
-    s = users_df[col].value_counts()
-    #s = users_df.loc[users_df['coded_as_witness']==1, col].value_counts()
-    users_df.loc[~users_df[col].isin(s.index[s >= MIN_COMMUNITY_SIZE]), col] = np.NaN
+# for col in comm_cols:
+#     s = users_df[col].value_counts()
+#     #s = users_df.loc[users_df['coded_as_witness']==1, col].value_counts()
+#     users_df.loc[~users_df[col].isin(s.index[s >= MIN_COMMUNITY_SIZE]), col] = np.NaN
+
 ```
 
 
@@ -590,7 +652,7 @@ create_plot_grid(df_list, axhline=exp_pos_proportion)
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_13_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_15_0.png)
 
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
@@ -618,11 +680,19 @@ def chi_square(X, y):
     Note: Automatically drops NaN rows
     '''
     
-    MIN_CELL_VAL = 5
-    
+    min_cell_val = 2
     confusion_matrix = pd.crosstab(X, y)
+    
+    if confusion_matrix.shape == (2,2):
+        min_cell_val = 5
+    
+    if confusion_matrix.shape[0] < 2 or confusion_matrix.shape[0] < 2:
+        print('WARNING: Single row or column provided: r={}, c={}'
+                  .format(confusion_matrix.shape[0], confusion_matrix.shape[1]))
+        return None
+        
     # Eliminate rows where observed cases are below threshold:
-    confusion_matrix = confusion_matrix[(confusion_matrix >= MIN_CELL_VAL).all(1)]
+    confusion_matrix = confusion_matrix[(confusion_matrix >= min_cell_val).all(1)]
     # Check dimensions, as eliminating shorter rows is preferred.
     if confusion_matrix.shape[0] < confusion_matrix.shape[1]:
         print('WARNING: check passed series order -- cell elimination performed row-wise. r={}, c={}'
@@ -633,8 +703,8 @@ def chi_square(X, y):
     exp_matrix.index = confusion_matrix.index
     
     # Repeat in case new cells become < threshold once rows are dropped
-    while (exp_matrix >= MIN_CELL_VAL).all(1).all() == False:
-        confusion_matrix = confusion_matrix[(exp_matrix >= MIN_CELL_VAL).all(1)]
+    while (exp_matrix >= min_cell_val).all(1).all() == False:
+        confusion_matrix = confusion_matrix[(exp_matrix >= min_cell_val).all(1)]
         exp_matrix = pd.DataFrame(scs.chi2_contingency(confusion_matrix)[3])
         exp_matrix.index = confusion_matrix.index
     
@@ -669,28 +739,28 @@ chi2a_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>203.524168</td>
-      <td>5.005149e-42</td>
+      <td>211.186118</td>
+      <td>7.455104e-40</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>76.213552</td>
-      <td>2.821223e-17</td>
+      <td>94.493169</td>
+      <td>2.372655e-20</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>125.452639</td>
-      <td>5.163057e-27</td>
+      <td>56.978430</td>
+      <td>2.597272e-12</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>154.292529</td>
-      <td>5.088985e-30</td>
+      <td>143.881668</td>
+      <td>7.807233e-28</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>207.972027</td>
-      <td>1.644365e-38</td>
+      <td>200.477682</td>
+      <td>4.387605e-35</td>
     </tr>
   </tbody>
 </table>
@@ -756,28 +826,28 @@ chi2b_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>55.752662</td>
-      <td>8.218691e-14</td>
+      <td>116.916736</td>
+      <td>2.993758e-27</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>52.367253</td>
-      <td>4.603366e-13</td>
+      <td>5309.547802</td>
+      <td>0.000000e+00</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>2.756299</td>
-      <td>9.687211e-02</td>
+      <td>7235.591424</td>
+      <td>0.000000e+00</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>147.466040</td>
-      <td>6.206597e-34</td>
+      <td>12.520518</td>
+      <td>4.025072e-04</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>295.778228</td>
-      <td>2.738891e-66</td>
+      <td>277.749038</td>
+      <td>2.323415e-62</td>
     </tr>
   </tbody>
 </table>
@@ -838,23 +908,23 @@ cramers_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.499062</td>
+      <td>0.402479</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.331235</td>
+      <td>0.000000</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.467963</td>
+      <td>0.000000</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>0.404088</td>
+      <td>0.389545</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.474934</td>
+      <td>0.426970</td>
     </tr>
   </tbody>
 </table>
@@ -924,23 +994,23 @@ theils_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.228286</td>
+      <td>0.266495</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.142234</td>
+      <td>0.322568</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.233647</td>
+      <td>0.264045</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>0.136705</td>
+      <td>0.132357</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.258152</td>
+      <td>0.246875</td>
     </tr>
   </tbody>
 </table>
@@ -1001,23 +1071,23 @@ rf_df
   <tbody>
     <tr>
       <th>c_modularity</th>
-      <td>0.242374</td>
+      <td>0.262228</td>
     </tr>
     <tr>
       <th>c_label_prop</th>
-      <td>0.074022</td>
+      <td>0.130405</td>
     </tr>
     <tr>
       <th>c_label_prop_asyn</th>
-      <td>0.167264</td>
+      <td>0.123066</td>
     </tr>
     <tr>
       <th>c_fluid</th>
-      <td>0.327971</td>
+      <td>0.170965</td>
     </tr>
     <tr>
       <th>c_louvain</th>
-      <td>0.188368</td>
+      <td>0.313336</td>
     </tr>
   </tbody>
 </table>
@@ -1037,7 +1107,7 @@ create_plot_grid(df_list)
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_28_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_30_0.png)
 
 
 ## Evaluation on Temporal Sub-Graphs
@@ -1120,55 +1190,19 @@ g_dict = get_graph_objects_time_sliced()
 
     Days in event: Hurricane Harvey: 7 
     Getting user and edge list for full graph...
-    Importing existing graph object for time slice 0 ...
-    Importing existing graph object for time slice 1 ...
-    Importing existing graph object for time slice 2 ...
-    Importing existing graph object for time slice 3 ...
-    Importing existing graph object for time slice 4 ...
-    Importing existing graph object for time slice 5 ...
-    Importing existing graph object for time slice 6 ...
-
-
-
-```python
-########################################################
-########################################################
-########################################################
-########################################################
-########################################################
-#### STOP HERE AND CHECK STATE OF users_df -- next section needn't import again and use temp, use copy instead.
-
-#raise Exception
-
-users_df.head()
-```
-
-
-    --------------------------------------
-
-    ExceptionTraceback (most recent call last)
-
-    <ipython-input-189-2ef5e6a42902> in <module>
-          1 #### STOP HERE AND CHECK STATE OF users_df -- next section needn't import again and use temp, use copy instead.
-          2 
-    ----> 3 raise Exception
-    
-
-    Exception: 
+    Creating new graph object for time slice 0...
+    Creating new graph object for time slice 1...
+    Creating new graph object for time slice 2...
+    Creating new graph object for time slice 3...
+    Creating new graph object for time slice 4...
+    Creating new graph object for time slice 5...
+    Creating new graph object for time slice 6...
 
 
 Calculate the community metrics for each subgraph and create time slice dataframes for each metric:
 
 
 ```python
-# import os
-# import pandas as pd
-# # Ignore FutureWarning from RF classifier
-# import warnings
-# warnings.simplefilter(action='ignore', category=FutureWarning)
-
-# users_df = pd.read_csv(DIR + DF_FILENAME, index_col=0)
-
 # TODO: check this cell, move into function?
 
 g_dict_comm = {}
@@ -1198,12 +1232,13 @@ for key in g_dict:
     
     # Create community dataframe
     nodes = g2.nodes(data=True)
-    df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
-    df_comm = df_comm.drop(['user_class', 'user_code', 'label'], axis=1)
+    df_comm_temp = pd.DataFrame.from_dict(dict(nodes), orient='index')
+    df_comm_temp.drop(['user_class', 'user_code', 'label'], axis=1, inplace=True)
     
-    # Merge dataframes
-    comm_cols = list(df_comm.columns)
-    users_df_temp = pd.merge(left=users_df, right=df_comm, how='left', left_on='screen_name', right_index=True)
+    comm_cols = list(df_comm_temp.columns)
+    # Create copy of df and add comm data from slice:
+    users_df_temp = users_df.copy().drop(columns=comm_cols)
+    users_df_temp = pd.merge(left=users_df_temp, right=df_comm_temp, how='left', left_on='screen_name', right_index=True)
 
     # Ignore small communities where observed cases are too low (required for chi-square tests)
     MIN_COMMUNITY_SIZE = 5
@@ -1223,22 +1258,80 @@ for key in g_dict:
     tslice_theils_df[key] = get_theils_df(X2, y2).iloc[:,0]
     # Random Forest
     tslice_rf_df[key] = get_rf_importance_df(X2, y2).iloc[:,0]
+    
+    users_df_temp = None
 ```
 
     Processing subgraph:  7
-    Importing existing community graph object...
+    Calculating community metrics for graph. 31390 nodes and 98838 edges...
+    Largest component has 18067 nodes and 74594 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  6
-    Importing existing community graph object...
+    Calculating community metrics for graph. 28899 nodes and 84765 edges...
+    Largest component has 16179 nodes and 63914 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  5
-    Importing existing community graph object...
+    Calculating community metrics for graph. 24625 nodes and 65207 edges...
+    Largest component has 13163 nodes and 48919 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  4
-    Importing existing community graph object...
+    Calculating community metrics for graph. 19892 nodes and 47670 edges...
+    Largest component has 10031 nodes and 35545 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  3
-    Importing existing community graph object...
+    Calculating community metrics for graph. 14021 nodes and 30094 edges...
+    Largest component has 6407 nodes and 22153 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  2
-    Importing existing community graph object...
+    Calculating community metrics for graph. 9194 nodes and 17107 edges...
+    Largest component has 3723 nodes and 12529 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
     Processing subgraph:  1
-    Importing existing community graph object...
+    Calculating community metrics for graph. 6616 nodes and 10268 edges...
+    Largest component has 2288 nodes and 7405 edges.
+    Calculating c_modularity...
+    Calculating c_label_prop...
+    Calculating c_label_prop_asyn...
+    Calculating c_fluid...
+    Calculating c_louvain...
+    Adding data as node attributes...
+    Writing to file...
 
 
 We can now inspect the rate of growth over the collection period. Edges are only included if they are connected to an existing user, therefore their growth should accelerate as the available users with which to connect increases.
@@ -1321,7 +1414,7 @@ dff
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_36_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_37_1.png)
 
 
 
@@ -1357,7 +1450,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_39_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_40_1.png)
 
 
 
@@ -1371,7 +1464,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_40_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
 
 
 
@@ -1385,7 +1478,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
 
 
 
@@ -1399,7 +1492,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_43_1.png)
 
 
 
@@ -1413,7 +1506,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_43_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_44_1.png)
 
 
 The stability in the Theil's U and Random Forest metrics suggest that the associations are strong even in smaller graphs. Therefore using these community data throughout the collection process in live classification is a viable strategy. Theil's U measures the fraction of Y (witness labels) we can predict using the community measures. The highest and most stable over time algorithms therefore appear to be c_modularity, c_label_prop_async, and c_louvain. Each of these shows a value of approximately .20-.25 over the course of the collection period.
@@ -1440,7 +1533,7 @@ def calc_network_metrics(G):
     G = nx.Graph(G)
     #### TESTING ####
     if not nx.is_connected(G):
-        print('ERROR: undirected graph not connected!')
+        print('ERROR: undirected graph not connected! Taking largest component from lengths:')
         print([len(x) for x in nx.connected_components(G)])
         Gcc = max(nx.connected_components(G), key=len)
         G = G.subgraph(Gcc)
@@ -1532,10 +1625,7 @@ def get_network_metrics_df(subgraphs_dict, title=None):
 
     print('Total community subgraphs: ', len(subgraphs_dict))
     for k, v in subgraphs_dict.items():
-        ### TESTING ###
-        #if k != 12:
-        #    continue
-        ###############
+        ############ TODO: If subgraph too small, return NANS ?? ############
         print('Calculating metrics for community ID: ', k)
         results = calc_network_metrics(v)    
         results_df[k] = results.values()
@@ -1566,10 +1656,11 @@ def get_subgraphs_by_attr(G, attr, min_subgraph_size=0):
     labels = set(node_data)
 
     for label in labels:
-        count = sum([1 for x in node_data if x == label])
-        # Exclude subgraphs below provided threshold.
-        if count < min_subgraph_size:
-            continue
+        #TODO: Remove this threshold and the min_subgraph_size argument above.
+#         # Exclude subgraphs below provided threshold.
+#         count = sum([1 for x in node_data if x == label])
+#         if count < min_subgraph_size:
+#             continue
         # Node generator:
         nodes = ( node for node, data in G.nodes(data=True) if data.get(attr) == label )
         subgraph = G.subgraph(nodes)
@@ -1577,21 +1668,12 @@ def get_subgraphs_by_attr(G, attr, min_subgraph_size=0):
     return subgraph_dict
 ```
 
-
-```python
-# e = Event.objects.all()[0]
-# filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
-
-# G = get_graph_object()
-# G = calc_community_metrics(G, filename)
-```
-
 For now, we can focus on the most promising community algorithm labels identified above: `c_modularity`, `c_label_prop_asyn`, `c_fluid`, `c_louvain`.
 
 We exclude communities smaller than 50.
 
 For each algorithm we do the following:
-* The complete graph is split by the algorithm's labels, and the network metrics for each subgraph are then calculated and stored in a dataframe.
+* The complete graph is partitioned by the algorithm's labels, and the network metrics for each subgraph are then calculated and stored in a dataframe.
 
 * We then calculate the ratio of positive-classed 'witness' cases against the total classed cases. As coding was done at random, some communities will have very few classed cases and therefore their ratios may not be statistically significant.
 
@@ -1599,10 +1681,16 @@ For each algorithm we do the following:
 
 
 ```python
-def get_community_metrics_df(G, comm_name, users_df, min_community_size=50):
+def get_community_metrics_df(G, comm_name, users_df):
     
     # Split graph by comm_name labels, and calculate network metrics per sub-graph:
-    subgraphs_dict = get_subgraphs_by_attr(G, comm_name, min_community_size)
+    subgraphs_dict = get_subgraphs_by_attr(G, comm_name)
+    # Ignore subgraphs with no coded user members:
+    orig_len = len(subgraphs_dict)
+    comm_ids_with_coded = users_df[comm_name].value_counts().index
+    subgraphs_dict = {k: subgraphs_dict[k] for k in comm_ids_with_coded}
+    print('Processing {} subgraphs containing coded users from total: {}. '.format(len(subgraphs_dict), orig_len))
+    
     results_df = get_network_metrics_df(subgraphs_dict, comm_name)
 
     # Calculate ratio of positive cases per community label and add to dataframe:
@@ -1629,60 +1717,420 @@ def get_community_metrics_df(G, comm_name, users_df, min_community_size=50):
 
 
 ```python
-#comm_names = ['c_modularity', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
-comm_names = ['c_label_prop_asyn']
+comm_names = ['c_modularity', 'c_label_prop', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
+selected_comm_names = ['c_modularity', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
+results_col_names = []
+df_list_array = []
+df_list_secondary_array = []
 
-for comm_name in comm_names:
+for comm_name in selected_comm_names:
     results_df = get_community_metrics_df(G, comm_name, users_df)
-    
-    #df_list = [results_df[[c]] for c in results_df.columns]
-    #df_list_secondary = [results_df['pos_ratio']]
-    #create_plot_grid(df_list, df_list_secondary, kind='line')
-    
+    results_col_names = results_df.columns
+
     # Trim by size of community and amount of cases coded within each:
     #min_community_size = 1000
     min_community_size = 0
-    min_total_coded = 0
-
+    min_total_coded = 1
     results_sub_df = results_df.loc[
                                 (results_df['nodes'] >= min_community_size) & 
                                 (results_df['total_coded'] >= min_total_coded)
                                     ].reset_index(drop=True)
     
-    df_list = [results_sub_df[[c]] for c in results_sub_df.columns]
-    df_list_secondary = [results_sub_df['pos_ratio']]
-    #create_plot_grid(df_list, df_list_secondary, kind='line')
+    # Create sub-df and save to file:
+    users_df_temp = pd.merge(left=users_df, right=results_sub_df, how='left', left_on=comm_name, right_on='size_rank')
+    users_df_temp.drop(columns=[x for x in comm_names if x != comm_names], inplace=True)
+    filename = 'df_users_{}_comm_metrics_{}.csv'.format(EVENT_NAME, comm_name)
+    users_df_temp.to_csv(DIR + filename)
+    users_df_temp = None
+    
+    # Add to array for ploting:
+    df_list_array.append( [results_sub_df[[c]] for c in results_sub_df.columns] )
+    df_list_secondary_array.append( [results_sub_df['pos_ratio']] )
 ```
 
+    Original dict length:  266
+    New dict length:  66
     Returning cached file...
+    Original dict length:  1485
+    New dict length:  200
+    Total community subgraphs:  200
+    Calculating metrics for community ID:  0.0
+    Calculating metrics for community ID:  1.0
+    Calculating metrics for community ID:  2.0
+    Calculating metrics for community ID:  12.0
+    Calculating metrics for community ID:  3.0
+    Calculating metrics for community ID:  38.0
+    Calculating metrics for community ID:  4.0
+    Calculating metrics for community ID:  6.0
+    Calculating metrics for community ID:  19.0
+    Calculating metrics for community ID:  43.0
+    Calculating metrics for community ID:  48.0
+    Calculating metrics for community ID:  17.0
+    Calculating metrics for community ID:  656.0
+    Calculating metrics for community ID:  27.0
+    Calculating metrics for community ID:  5.0
+    Calculating metrics for community ID:  317.0
+    Calculating metrics for community ID:  155.0
+    Calculating metrics for community ID:  26.0
+    Calculating metrics for community ID:  45.0
+    Calculating metrics for community ID:  14.0
+    Calculating metrics for community ID:  32.0
+    Calculating metrics for community ID:  15.0
+    Calculating metrics for community ID:  987.0
+    Calculating metrics for community ID:  550.0
+    Calculating metrics for community ID:  31.0
+    Calculating metrics for community ID:  1081.0
+    Calculating metrics for community ID:  873.0
+    Calculating metrics for community ID:  503.0
+    Calculating metrics for community ID:  501.0
+    Calculating metrics for community ID:  998.0
+    Calculating metrics for community ID:  562.0
+    Calculating metrics for community ID:  495.0
+    Calculating metrics for community ID:  1230.0
+    Calculating metrics for community ID:  560.0
+    Calculating metrics for community ID:  461.0
+    Calculating metrics for community ID:  1085.0
+    Calculating metrics for community ID:  379.0
+    Calculating metrics for community ID:  637.0
+    Calculating metrics for community ID:  690.0
+    Calculating metrics for community ID:  1387.0
+    Calculating metrics for community ID:  1414.0
+    Calculating metrics for community ID:  181.0
+    Calculating metrics for community ID:  129.0
+    Calculating metrics for community ID:  523.0
+    Calculating metrics for community ID:  602.0
+    Calculating metrics for community ID:  1020.0
+    Calculating metrics for community ID:  574.0
+    Calculating metrics for community ID:  350.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2, 2]
+    Calculating metrics for community ID:  266.0
+    Calculating metrics for community ID:  731.0
+    Calculating metrics for community ID:  1384.0
+    Calculating metrics for community ID:  327.0
+    Calculating metrics for community ID:  496.0
+    Calculating metrics for community ID:  239.0
+    Calculating metrics for community ID:  249.0
+    Calculating metrics for community ID:  980.0
+    Calculating metrics for community ID:  1097.0
+    Calculating metrics for community ID:  1455.0
+    Calculating metrics for community ID:  655.0
+    Calculating metrics for community ID:  697.0
+    Calculating metrics for community ID:  7.0
+    Calculating metrics for community ID:  240.0
+    Calculating metrics for community ID:  106.0
+    Calculating metrics for community ID:  880.0
+    Calculating metrics for community ID:  832.0
+    Calculating metrics for community ID:  944.0
+    Calculating metrics for community ID:  86.0
+    Calculating metrics for community ID:  164.0
+    Calculating metrics for community ID:  40.0
+    Calculating metrics for community ID:  152.0
+    Calculating metrics for community ID:  24.0
+    Calculating metrics for community ID:  144.0
+    Calculating metrics for community ID:  55.0
+    Calculating metrics for community ID:  448.0
+    Calculating metrics for community ID:  63.0
+    Calculating metrics for community ID:  35.0
+    Calculating metrics for community ID:  11.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [32, 2]
+    Calculating metrics for community ID:  220.0
+    Calculating metrics for community ID:  13.0
+    Calculating metrics for community ID:  44.0
+    Calculating metrics for community ID:  36.0
+    Calculating metrics for community ID:  21.0
+    Calculating metrics for community ID:  10.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [32, 3]
+    Calculating metrics for community ID:  122.0
+    Calculating metrics for community ID:  20.0
+    Calculating metrics for community ID:  148.0
+    Calculating metrics for community ID:  124.0
+    Calculating metrics for community ID:  47.0
+    Calculating metrics for community ID:  9.0
+    Calculating metrics for community ID:  88.0
+    Calculating metrics for community ID:  384.0
+    Calculating metrics for community ID:  1105.0
+    Calculating metrics for community ID:  30.0
+    Calculating metrics for community ID:  53.0
+    Calculating metrics for community ID:  25.0
+    Calculating metrics for community ID:  912.0
+    Calculating metrics for community ID:  360.0
+    Calculating metrics for community ID:  39.0
+    Calculating metrics for community ID:  102.0
+    Calculating metrics for community ID:  896.0
+    Calculating metrics for community ID:  893.0
+    Calculating metrics for community ID:  699.0
+    Calculating metrics for community ID:  797.0
+    Calculating metrics for community ID:  278.0
+    Calculating metrics for community ID:  834.0
+    Calculating metrics for community ID:  310.0
+    Calculating metrics for community ID:  649.0
+    Calculating metrics for community ID:  724.0
+    Calculating metrics for community ID:  263.0
+    Calculating metrics for community ID:  1368.0
+    Calculating metrics for community ID:  1195.0
+    Calculating metrics for community ID:  551.0
+    Calculating metrics for community ID:  929.0
+    Calculating metrics for community ID:  531.0
+    Calculating metrics for community ID:  483.0
+    Calculating metrics for community ID:  770.0
+    Calculating metrics for community ID:  375.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2, 2]
+    Calculating metrics for community ID:  1364.0
+    Calculating metrics for community ID:  1068.0
+    Calculating metrics for community ID:  619.0
+    Calculating metrics for community ID:  305.0
+    Calculating metrics for community ID:  526.0
+    Calculating metrics for community ID:  721.0
+    Calculating metrics for community ID:  309.0
+    Calculating metrics for community ID:  1114.0
+    Calculating metrics for community ID:  290.0
+    Calculating metrics for community ID:  614.0
+    Calculating metrics for community ID:  585.0
+    Calculating metrics for community ID:  378.0
+    Calculating metrics for community ID:  663.0
+    Calculating metrics for community ID:  1429.0
+    Calculating metrics for community ID:  291.0
+    Calculating metrics for community ID:  437.0
+    Calculating metrics for community ID:  1148.0
+    Calculating metrics for community ID:  978.0
+    Calculating metrics for community ID:  825.0
+    Calculating metrics for community ID:  293.0
+    Calculating metrics for community ID:  1022.0
+    Calculating metrics for community ID:  1123.0
+    Calculating metrics for community ID:  579.0
+    Calculating metrics for community ID:  609.0
+    Calculating metrics for community ID:  535.0
+    Calculating metrics for community ID:  981.0
+    Calculating metrics for community ID:  1169.0
+    Calculating metrics for community ID:  916.0
+    Calculating metrics for community ID:  347.0
+    Calculating metrics for community ID:  366.0
+    Calculating metrics for community ID:  145.0
+    Calculating metrics for community ID:  986.0
+    Calculating metrics for community ID:  179.0
+    Calculating metrics for community ID:  827.0
+    Calculating metrics for community ID:  657.0
+    Calculating metrics for community ID:  1193.0
+    Calculating metrics for community ID:  552.0
+    Calculating metrics for community ID:  479.0
+    Calculating metrics for community ID:  792.0
+    Calculating metrics for community ID:  374.0
+    Calculating metrics for community ID:  71.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [6, 2]
+    Calculating metrics for community ID:  1054.0
+    Calculating metrics for community ID:  1207.0
+    Calculating metrics for community ID:  611.0
+    Calculating metrics for community ID:  559.0
+    Calculating metrics for community ID:  1029.0
+    Calculating metrics for community ID:  630.0
+    Calculating metrics for community ID:  349.0
+    Calculating metrics for community ID:  391.0
+    Calculating metrics for community ID:  273.0
+    Calculating metrics for community ID:  566.0
+    Calculating metrics for community ID:  570.0
+    Calculating metrics for community ID:  733.0
+    Calculating metrics for community ID:  1180.0
+    Calculating metrics for community ID:  866.0
+    Calculating metrics for community ID:  671.0
+    Calculating metrics for community ID:  267.0
+    Calculating metrics for community ID:  1427.0
+    Calculating metrics for community ID:  202.0
+    Calculating metrics for community ID:  171.0
+    Calculating metrics for community ID:  95.0
+    Calculating metrics for community ID:  230.0
+    Calculating metrics for community ID:  109.0
+    Calculating metrics for community ID:  372.0
+    Calculating metrics for community ID:  125.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [3, 3]
+    Calculating metrics for community ID:  276.0
+    Calculating metrics for community ID:  174.0
+    Calculating metrics for community ID:  214.0
+    Calculating metrics for community ID:  292.0
+    Calculating metrics for community ID:  584.0
+    Calculating metrics for community ID:  246.0
+    Calculating metrics for community ID:  194.0
+    Calculating metrics for community ID:  146.0
+    Calculating metrics for community ID:  492.0
+    Calculating metrics for community ID:  1304.0
+    Calculating metrics for community ID:  1328.0
+    Calculating metrics for community ID:  242.0
+    Calculating metrics for community ID:  876.0
+    Calculating metrics for community ID:  170.0
+    Calculating metrics for community ID:  778.0
+    Calculating metrics for community ID:  85.0
+    Calculating metrics for community ID:  203.0
+    Calculating metrics for community ID:  1374.0
+    WARNING: Communities not sorted by size
+    Original dict length:  8
+    New dict length:  8
+    Total community subgraphs:  8
+    Calculating metrics for community ID:  1.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2698, 1, 1, 2, 1, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1]
+    Calculating metrics for community ID:  2.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2691, 1, 3, 3, 1, 1, 1, 1, 1, 3, 1, 1, 1, 3, 1]
+    Calculating metrics for community ID:  0.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2540, 3, 2, 2, 5, 2, 11, 1, 1, 2, 1, 1, 4, 2, 2, 5, 3, 9, 1, 3, 13, 1, 3, 5, 2, 1, 2, 6, 2, 6, 2, 1, 2, 4, 2, 1, 3, 1, 1, 1, 1, 1, 2, 2, 2, 1, 1, 1, 3, 1, 1, 2, 2, 4, 1, 1, 2, 1, 1, 3, 2, 1, 1, 1, 4, 1, 3, 2, 1, 2, 3, 1, 1, 1, 2, 1, 1, 1, 2, 2, 1, 2, 1, 1, 2, 3, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    Calculating metrics for community ID:  3.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2459, 3, 3, 2, 1, 7, 3, 4, 1, 1, 1, 1, 1, 1, 1]
+    Calculating metrics for community ID:  6.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [1361, 2, 11, 1, 1, 1, 1, 8, 2, 13, 1, 10, 2, 1, 2, 1, 2, 6, 8, 1, 5, 2, 1, 5, 1, 6, 1, 4, 1, 1, 2, 1, 2, 2, 12, 2, 4, 4, 4, 11, 5, 1, 4, 1, 1, 1, 1, 6, 1, 3, 2, 1, 2, 2, 1, 5, 4, 6, 4, 4, 3, 1, 2, 2, 1, 3, 1, 1, 1, 6, 1, 1, 6, 1, 1, 1, 1, 1, 1, 1, 6, 1, 1, 4, 4, 1, 1, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 2, 2, 1, 1, 5, 1, 2, 1, 3, 1, 1, 1, 2, 1, 2, 3, 1, 1, 1, 3, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 3, 3, 2, 1, 2, 1, 2, 1, 1, 1, 2, 1, 1, 3, 1, 4, 2, 1, 1, 1, 1, 2, 2, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1, 2, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    Calculating metrics for community ID:  5.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [684, 1, 33, 2, 155, 3, 2, 2, 4, 1, 19, 2, 1, 2, 1, 1, 1, 2, 1, 2, 2, 1, 18, 4, 3, 1, 5, 19, 3, 1, 6, 15, 2, 1, 1, 1, 1, 1, 2, 6, 6, 1, 1, 1, 1, 9, 6, 8, 3, 1, 1, 2, 2, 1, 2, 1, 10, 3, 2, 2, 4, 1, 1, 1, 2, 2, 6, 4, 7, 2, 1, 1, 3, 2, 1, 5, 5, 1, 2, 18, 1, 12, 1, 4, 2, 4, 1, 10, 4, 2, 1, 2, 3, 1, 11, 1, 5, 2, 3, 4, 2, 3, 4, 1, 3, 8, 3, 2, 1, 13, 1, 2, 2, 4, 2, 1, 7, 1, 1, 1, 4, 1, 9, 1, 4, 1, 1, 1, 2, 1, 9, 2, 3, 1, 1, 1, 2, 2, 1, 5, 3, 2, 2, 1, 1, 1, 7, 3, 2, 2, 3, 3, 3, 2, 1, 3, 2, 1, 3, 6, 4, 1, 3, 1, 12, 1, 4, 1, 3, 1, 2, 1, 3, 1, 3, 1, 1, 2, 1, 1, 4, 2, 1, 3, 1, 10, 2, 2, 1, 1, 4, 2, 1, 1, 1, 1, 3, 1, 3, 2, 1, 1, 5, 1, 3, 5, 2, 5, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1, 2, 5, 2, 3, 1, 5, 1, 3, 1, 1, 2, 1, 2, 1, 5, 6, 1, 5, 3, 1, 1, 1, 1, 1, 2, 6, 1, 3, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 3, 1, 2, 6, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 5, 1, 1, 3, 1, 3, 4, 4, 1, 1, 1, 1, 1, 1, 2, 3, 1, 1, 2, 1, 1, 3, 2, 1, 1, 1, 1, 2, 3, 4, 2, 2, 1, 1, 1, 1, 4, 1, 5, 6, 1, 2, 2, 1, 3, 2, 1, 1, 2, 1, 3, 1, 1, 1, 2, 1, 1, 1, 1, 1, 3, 2, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 4, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 3, 1, 1, 2, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    Calculating metrics for community ID:  7.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [1539, 1, 2, 1, 7, 1, 4, 1, 8, 12, 4, 3, 4, 1, 2, 6, 2, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 2, 1, 1, 1, 1, 1, 1, 2, 2, 5, 5, 1, 1, 1, 1, 2, 1, 1, 1, 2, 1, 2, 1, 2, 4, 1, 1, 2, 1, 1, 1, 2, 1, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1]
+    Calculating metrics for community ID:  4.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [2095, 3, 1, 1, 1, 1, 4, 1, 1, 4, 6, 1, 2, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 5, 1, 1, 2, 1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    WARNING: Communities not sorted by size
+    Original dict length:  73
+    New dict length:  37
+    Total community subgraphs:  37
+    Calculating metrics for community ID:  0.0
+    Calculating metrics for community ID:  2.0
+    Calculating metrics for community ID:  1.0
+    Calculating metrics for community ID:  3.0
+    Calculating metrics for community ID:  4.0
+    Calculating metrics for community ID:  6.0
+    Calculating metrics for community ID:  7.0
+    Calculating metrics for community ID:  5.0
+    Calculating metrics for community ID:  8.0
+    Calculating metrics for community ID:  10.0
+    Calculating metrics for community ID:  9.0
+    Calculating metrics for community ID:  11.0
+    Calculating metrics for community ID:  15.0
+    Calculating metrics for community ID:  22.0
+    Calculating metrics for community ID:  12.0
+    Calculating metrics for community ID:  17.0
+    Calculating metrics for community ID:  14.0
+    Calculating metrics for community ID:  18.0
+    Calculating metrics for community ID:  19.0
+    Calculating metrics for community ID:  16.0
+    Calculating metrics for community ID:  26.0
+    Calculating metrics for community ID:  13.0
+    Calculating metrics for community ID:  20.0
+    Calculating metrics for community ID:  36.0
+    Calculating metrics for community ID:  33.0
+    Calculating metrics for community ID:  23.0
+    Calculating metrics for community ID:  35.0
+    Calculating metrics for community ID:  25.0
+    Calculating metrics for community ID:  32.0
+    Calculating metrics for community ID:  31.0
+    Calculating metrics for community ID:  63.0
+    Calculating metrics for community ID:  29.0
+    Calculating metrics for community ID:  58.0
+    Calculating metrics for community ID:  55.0
+    Calculating metrics for community ID:  27.0
+    ERROR: undirected graph not connected! Taking largest component from lengths:
+    [3, 3, 4, 3, 3]
+    Calculating metrics for community ID:  44.0
+    Calculating metrics for community ID:  69.0
+    WARNING: Communities not sorted by size
 
 
 
 ```python
-# TODO:
-# Why is there so few total_coded within the communities -- should be closer to 1500?
-sum(results_sub_df['total_coded'])
+# Plot:
+for c in len(df_list_array):
+    create_plot_grid(df_list_array[c], df_list_secondary_array[c], kind='line')
 ```
 
 
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_52_0.png)
 
 
-    113
+The community network metrics have now been calculated and added to a copy of the users dataframe for each algorithm, creating a set of enhanced dataframes. The graphs above indicate a potential relationship between the positive ratio and certain centrality measures.
 
-
+We can now check each dataframe for correlative properties (that is, a linear relationship between the calculated metric and the coded label).
 
 
 ```python
-create_plot_grid(df_list, df_list_secondary, kind='line')
+# TODO: unbalanced community size resulting in useless results here:\
+
+from sklearn.linear_model import LogisticRegression
+import matplotlib.pyplot as plt
+
+
+comm_names = ['c_modularity', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
+#comm_names = ['c_label_prop_asyn']
+
+results_col_names = ['size_rank', 'nodes', 'edges', 'avg_degree',
+                       'avg_shortest_path_length', 'diameter', 'ex_diameter', 'diameter_diff',
+                       'transitivity', 'ex_transitivity', 'transitivity_diff',
+                       'avg_clustering', 'avg_degree_centrality', 'avg_eigenvector_centrality',
+                       'avg_betweenness_centrality', 'avg_load_centrality',
+                       'avg_closeness_centrality']
+
+
+score_df = pd.DataFrame(index = results_col_names)
+
+#### TESTING ####
+plot = True
+#################
+
+for comm_name in comm_names:
+    results = []
+    
+    filename = 'df_users_{}_comm_metrics_{}.csv'.format(EVENT_NAME, comm_name)
+
+    users_df_temp = pd.read_csv(DIR + filename, index_col=0)
+    users_df_temp = users_df_temp.loc[users_df_temp[results_col_names].notna().all(axis=1)]
+    y = users_df_temp['coded_as_witness']
+    #print('positive class ratio:', sum(y)/y.shape[0])
+    #users_df_temp = users_df_temp[results_col_names]
+
+    # Calculate logreg scores for each value and add column to dataframe
+    for col in results_col_names:
+        X = users_df_temp[col]
+        X = X.values.reshape(-1,1)
+        clf = LogisticRegression(random_state=0, solver='lbfgs').fit(X, y)
+        #print(col, ' Score: {:.5f}'.format(clf.score(X, y)))
+        results.append(clf.score(X, y))
+        
+        #### TESTING ####
+        if plot:
+            print(col)
+            plt.figure(1, figsize=(8, 6))
+            #plt.clf()
+            plt.scatter(X, y, color='black', zorder=20)
+            #plt.plot(X, clf.coef_ * X + clf.intercept_, linewidth=1)
+            plot = False
+        #################
+
+    score_df[comm_name] = results
+    
+#score_df
 ```
 
+    size_rank
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_53_0.png)
+
+
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_54_1.png)
 
 
 
 ```python
 # Stop running here
+
+# Work out way to measure correlation between numeric and categorical
+## point biserial correlation, logistic regression, and Kruskal Wallis H Test
+## Measure corr for each col for each dataframe
+
+# create basic ML notebook for testing
+# TODO: Check visualisation of fluid network communities which appear v disconnected.
 
 raise Exception
 ```
@@ -1696,10 +2144,6 @@ df_list_secondary = [results_df['pos_ratio']]
 
 create_plot_grid(df_list, df_list_secondary, kind='line')
 ```
-
-
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_56_0.png)
-
 
 While there appears to be regular patterns in the data above, we must remember that many of the calculated metrics are influcenced by the size of the graph. As the size also influences the amount of coded examples within the graph, we cannot interpret these results meaningfully. For example, the four smallest graphs have ~60 nodes and no coded cases. Three graphs have zero positive cases, but only a single negative code, which isn't statistically significant. Therefore, we can drop communities below a certain size and re-examine the relationships.
 
@@ -1718,17 +2162,36 @@ create_plot_grid(df_list, df_list_secondary, kind='line')
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_58_0.png)
-
-
-
 ```python
 
 ```
 
+### Adding to Dataframe
+We can simply add all metrics to the DF for testing with various ML models
+
 
 ```python
-temp_df
+#users_df.head()
+#results_sub_df.head()
+results_df.head()
+```
+
+
+```python
+# userst_df = users_df.copy()
+# userst_df.loc[userst_df['c_label_prop_asyn']==3].head()
+userst_df = None
+```
+
+
+```python
+userst_df = pd.merge(left=userst_df, right=results_sub_df, how='left', left_on='c_label_prop_asyn', right_on='size_rank')
+userst_df.drop(columns=[x for x in comm_names if x != 'c_label_prop_asyn'], inplace=True)
+```
+
+
+```python
+sum(userst_df['ex_transitivity'].value_counts())
 ```
 
 
