@@ -2060,7 +2060,10 @@ We can now check each dataframe for correlative properties (that is, a linear re
 # TODO: unbalanced community size resulting in useless results here:\
 
 from sklearn.linear_model import LogisticRegression
+
+#### TESTING ####
 import matplotlib.pyplot as plt
+#################
 
 
 comm_names = ['c_modularity', 'c_label_prop_asyn', 'c_fluid', 'c_louvain']
@@ -2086,6 +2089,7 @@ for comm_name in comm_names:
     filename = 'df_users_{}_comm_metrics_{}.csv'.format(EVENT_NAME, comm_name)
 
     users_df_temp = pd.read_csv(DIR + filename, index_col=0)
+    # Drop NaN rows: TODO: should be labelling these rows as their own disconnected community instead?
     users_df_temp = users_df_temp.loc[users_df_temp[results_col_names].notna().all(axis=1)]
     y = users_df_temp['coded_as_witness']
     #print('positive class ratio:', sum(y)/y.shape[0])
