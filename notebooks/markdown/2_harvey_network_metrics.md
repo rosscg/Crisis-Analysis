@@ -32,17 +32,6 @@ The following image shows the output of a community detection algorithm which ha
 
 <img src="./data/harvey_user_location/img/harvey-network-structure-community.png" alt="network-structure-community" style="width: 600px;"/>
 
-## Calculating Community Labels
-In the following section, the original dataframe is enhanced with modularity metrics. These are features which are calculated based upon the graph structure of the user friend/follower network. There are a number of community detection algorithms, so a set of these have been calculated to be tested and compared for association to the target (witness) class.
-
-Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were chosen due to their common use for these applications as well as the availability of their implmentations within the package.
-
-The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges. 
-
-As most algorithms require an undirected graph, the direction of relationships was ignored.
-
-Communities are labelled as numbers according to their ranking in size (where 0 is the largest), thus the labels have some level of ordinality.
-
 
 ```python
 ### Initialisation ###
@@ -98,6 +87,183 @@ def get_graph_object():
     return G
 ```
 
+## Testing Label Correlation
+
+Before creating calculating community structure, we can inspect the assortativity coefficient to evaluate how closely similarly-labelled nodes are related within the graph structure. 
+
+$Modularity$ is calculated, where edges between nodes with the same label are compared to the liklihood of the edge existing at random in a graph with similar degree distributions.
+This is defined by the formula:
+
+$Q = \frac{1}{2m} \sum_{ij} \left( A_{ij} - \frac{k_ik_j}{2m}\right)
+            \delta(c_i,c_j)$
+            
+where $m$ is the number of edges, $A$ is the adjacency matrix of `G`, $k_i$ is the degree of $i$ and $\delta(c_i, c_j)$ is the Kronecker delta: 1 if $i$ and $j$ are in the same community and 0 otherwise.
+
+The assortativity coefficient normalises this value by the equivalent perfectly mixed graph (all edges fall within the same communities) with a similar degree distribution (the configuration model). This result is an example of a Pearson's correlation coefficient.
+
+$Q_{mixed} = \frac{1}{2m} (  2m - \sum_{ij}\frac{k_ik_j}{2m} 
+            \delta(c_i,c_j))$
+            
+$Assortativity Coefficient = Q/Q_{mixed}$
+
+This gives a value between -1 and 1, with 0 denoting no correlation.
+
+In essence, the assortativity coefficient measures the correlation between the chosen characteristics of every pair of nodes that are connected.
+
+Reference: Newman, M. (2018). Networks.
+
+
+```python
+# Calculate the assortativity coeffficient
+# Reference: Newman, M. (2018). Networks. p211
+# Adapted from https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/community/quality.html
+
+from itertools import product
+from networkx.algorithms.community.community_utils import is_partition
+
+def assortativity_coef(G, communities, weight='weight'):
+    if not isinstance(communities, list):
+        communities = list(communities)
+    if not is_partition(G, communities):
+        raise Exception("Not a partition")
+    if G.is_directed():
+        raise Exception("Directed not supported")
+    if G.is_multigraph():
+        raise Exception("Multigraphs not yet supported")
+
+    m = G.size(weight=weight)
+
+    out_degree = dict(G.degree(weight=weight))
+    in_degree = out_degree # Redundant as only undirected supported
+    norm = 1 / (2 * m)
+
+    def val(u, v):
+        try:
+            w = G[u][v].get(weight, 1)
+        except KeyError:
+            w = 0
+        # Double count self-loops if the graph is undirected.
+        #if u == v:
+        #    w *= 2
+        return w - in_degree[u] * out_degree[v] * norm
+
+    def val2(u, v):
+        return in_degree[u] * out_degree[v] * norm
+
+    Q = sum(val(u, v) for c in communities for u, v in product(c, repeat=2))
+
+    Qmax = ((2*m) - sum(val2(u, v) for c in communities for u, v in product(c, repeat=2)))
+
+    return Q / Qmax
+```
+
+
+```python
+def print_assort(G, labels, label_name):
+    # Note: labels is a 2d array to support merging labels.
+    partition = []
+    for label in labels:
+        community = [node for node, data in G.nodes(data=True) if data.get(label_name) in label]
+        partition.append(community)
+    #print('Graph size: ', len(G))
+    #print('Community sizes: ', [len(x) for x in partition])
+    assort_value = assortativity_coef(G, partition)
+    print('Assortativity Coefficient: ', "{:.3f}".format(assort_value))
+    return
+
+# Create an undirected subgraph of nodes which have been coded:
+G2 = get_graph_object()
+G2 = nx.Graph(G2)
+nodes = [
+    node
+    for node, data
+    in G2.nodes(data=True)
+    if data.get("user_code") != ""
+]
+Gsub = G2.subgraph(nodes)
+
+##### Save subgraph to file: #####
+filename = 'network_data_{}_coded_subgraph.gexf'.format(EVENT_NAME)
+nx.write_gexf(Gsub, GRAPH_DIR + filename, prettyprint=True)
+##################################
+
+print('Graph size: ', len(Gsub))
+labels = [[x] for x in set(nx.get_node_attributes(Gsub,'user_code').values())]
+print_assort(Gsub, labels, "user_code")
+# Merging Unsure label:
+labels_merged = [["Witness", "Unsure"], ["Non-Witness"]]
+print("with Unsure and Witness labels merged:")
+print_assort(Gsub, labels_merged, "user_code")
+
+# Run again using only largest component:
+print('\nUsing largest Component (of full graph):')
+G3 = G2.subgraph(max(nx.connected_components(G2), key=len))
+Gsub = G3.subgraph(nodes)
+print('Graph size: ', len(Gsub))
+print_assort(Gsub, labels, "user_code")
+print("with Unsure and Witness labels merged:")
+print_assort(Gsub, labels_merged, "user_code")
+
+# Repeat calculations while dropping the unsure values:
+print('\nGraph excluding Unsure-labelled nodes:')
+nodes = [
+    node
+    for node, data
+    in G2.nodes(data=True)
+    if data.get("user_code") not in ["", "Unsure"]
+]
+Gsub = G2.subgraph(nodes)
+print('Graph size: ', len(Gsub))
+labels = [[x] for x in set(nx.get_node_attributes(Gsub,'user_code').values())]
+print_assort(Gsub, labels, "user_code")
+print('\nUsing largest Component (of full graph):')
+G3 = G2.subgraph(max(nx.connected_components(G2), key=len))
+Gsub = G3.subgraph(nodes)
+print('Graph size: ', len(Gsub))
+print_assort(Gsub, labels, "user_code")
+
+
+G2 = None
+G3 = None
+Gsub = None
+```
+
+    Graph size:  1500
+    Assortativity Coefficient:  0.383
+    with Unsure and Witness labels merged:
+    Assortativity Coefficient:  0.406
+    
+    Using largest Component:
+    Graph size:  903
+    Assortativity Coefficient:  0.378
+    with Unsure and Witness labels merged:
+    Assortativity Coefficient:  0.402
+    
+    Graph excluding Unsure-labelled nodes:
+    Graph size:  1469
+    Assortativity Coefficient:  0.394
+    Using largest Component:
+    Graph size:  882
+    Assortativity Coefficient:  0.389
+
+
+The above results tests two subgraphs: the subgraph $G_1$ of the total graph $G$, where $G_1$ contains all of the coded user nodes; and the subgraph $G_2$, which contains all of the coded user nodes of the largest connected component of $G$.
+
+As the 'Unsure' label is only a small proportion of the total, the coefficient is also calculated after merging Unsure and Witness labels. Subgraphs of $G_1$ and $G_2$ which exclude 'Unsure' nodes are also evaluated.
+
+Across all tests, which evaluate graphs of size ~1500 and ~900, the assortativity coefficient falls between 0.378 and 0.406, suggesting a moderate level of homophily within the network, across the 'Witness'/'Non-Witness' dimension. This suggests that accounts are moderately more likely than random to be connected to similarly-coded accounts and therefore, these connections are likely to provide meaninful information in predictive modelling approaches.
+
+## Calculating Community Labels
+In the following section, the original dataframe is enhanced with modularity metrics. These are features which are calculated based upon the graph structure of the user friend/follower network. There are a number of community detection algorithms, so a set of these have been calculated to be tested and compared for association to the target (witness) class.
+
+Community metrics were calculated using the `networkx` implementations of `greedy_modularity_communities`, `label_propagation_communities`, `asyn_lpa_communities`, `asyn_fluidc` and `community_louvain` from the `community` package. These were chosen due to their common use for these applications as well as the availability of their implmentations within the package.
+
+The graph includes all detected users (i.e. not their followers/friends unless they were also detected as authors) for a total of 31,496 nodes and 99,602 edges. Community detection was performed on subgraph representing the largest connected component of 17,958 nodes and 75,203 edges. 
+
+As most algorithms require an undirected graph, the direction of relationships was ignored.
+
+Communities are labelled as numbers according to their ranking in size (where 0 is the largest), thus the labels have some level of ordinality.
+
 
 ```python
 # Modularity:   https://scholar.google.com/scholar?q=Finding+community+structure+in+very+large+networks
@@ -149,7 +315,7 @@ def calc_community_metrics(G, filename=False):
     # Discard other components:
     if RETURN_GIANT_COMPONENT:
         G = G.subgraph(Hcc)
-
+    
     # Get communities
     print('Calculating c_modularity...')
     c_modularity = list(greedy_modularity_communities(H0))
@@ -198,31 +364,53 @@ def calc_community_metrics(G, filename=False):
 
 
 ```python
+# # Modularity:   https://scholar.google.com/scholar?q=Finding+community+structure+in+very+large+networks
+# # Label Prop:   https://neo4j.com/docs/graph-algorithms/current/algorithms/label-propagation/#algorithms-label-propagation-sample
+# # Louvain:      https://github.com/taynaud/python-louvain/blob/master/docs/index.rst
+
+# #import networkx as nx
+# from networkx.algorithms.community import greedy_modularity_communities
+# from networkx.algorithms.community.quality import performance
+
+# def eval_community_presence(G):
+        
+#     print('Evaluating community presence for graph. {} nodes and {} edges...'
+#               .format(len(G), G.number_of_edges()))
+
+#     # Create undirected graph (required for community detection):
+#     H = nx.Graph(G)
+
+#     # Get largest component
+#     Hcc = max(nx.connected_components(H), key=len)
+#     H0 = H.subgraph(Hcc)
+#     #H0 = nx.connected_component_subgraphs(H)[0]
+#     print('Largest component has {} nodes and {} edges.'
+#               .format(len(H0), H0.number_of_edges()))
+
+#     # Get communities
+#     print('Calculating c_modularity...')
+#     partition = greedy_modularity_communities(H0)
+#     perf = performance(H0, partition)
+#     print('Performance: ', perf)
+    
+#     return
+```
+
+
+```python
 e = Event.objects.all()[0]
 filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
 
 G = get_graph_object()
 G = calc_community_metrics(G, filename)
 
-# Create datagrame from graph node attributes
+# Create dataframe from graph node attributes
 nodes = G.nodes(data=True)
 df_comm = pd.DataFrame.from_dict(dict(nodes), orient='index')
 df_comm.drop(['user_class', 'user_code', 'label'], axis=1, inplace=True)
 #df_comm = df_comm.reset_index(drop=True)
 df_comm.head()
 ```
-
-    Creating new graph object from database...
-    Calculating community metrics for graph. 31931 nodes and 101096 edges...
-    Largest component has 18409 nodes and 76341 edges.
-    Calculating c_modularity...
-    Calculating c_label_prop...
-    Calculating c_label_prop_asyn...
-    Calculating c_fluid...
-    Calculating c_louvain...
-    Adding data as node attributes...
-    Writing to file...
-
 
 
 
@@ -470,6 +658,135 @@ users_df.head()
 
 
 
+### Strength of Community Structure
+
+ We can measure the strength of our community classifications using the assortativity matrix described above. This will allow us to both compare the performance of community algorithms, and evaluate the modular structure of the graph (that is, the level to which communities exist within the network).
+
+
+```python
+### TESTING ###
+# e = Event.objects.all()[0]
+# filename = 'network_data_{}_comm.gexf'.format(e.name.replace(' ', ''))
+# G = get_graph_object()
+# G = calc_community_metrics(G, filename)
+# print('Graph size: ', len(G))
+###############
+
+# Make undirected
+G2 = nx.Graph(G)
+
+comm_titles = [x for x in set([k for n in G2.nodes for k in G2.nodes[n].keys()]) if x[:2] == "c_"]
+
+print('Graph size:', len(G2))
+print('\nCalculating assortativity coefficient by community label:')
+for title in comm_titles:
+    labels = [[x] for x in set(nx.get_node_attributes(G2, title).values())]
+    print('\n{}: {} communities'.format(title, len(labels)))
+    print_assort(G2, labels, title)
+    
+    
+G2 = None
+```
+
+    Graph size: 18409
+    
+    Calculating assortativity coefficient by label:
+    
+    c_label_prop_asyn: 1485 communities
+    Assortativity Coefficient:  0.732
+    
+    c_label_prop: 1492 communities
+    Assortativity Coefficient:  0.707
+    
+    c_fluid: 8 communities
+    Assortativity Coefficient:  0.651
+    
+    c_louvain: 73 communities
+    Assortativity Coefficient:  0.732
+    
+    c_modularity: 266 communities
+    Assortativity Coefficient:  0.740
+
+
+For comparison, we perform the same calculations on the configuration model (random graph with equivalent degree sequence):
+
+
+```python
+degree_sequence = sorted([d for n, d in G.degree()], reverse=True)
+
+Gc=nx.configuration_model(degree_sequence)
+
+# Remove parallel edges and self loops:
+Gc = nx.Graph(Gc)
+#Gc.remove_edges_from(Gc.selfloop_edges())
+
+Gc = calc_community_metrics(Gc)
+
+comm_titles = [x for x in set([k for n in Gc.nodes for k in Gc.nodes[n].keys()]) if x[:2] == "c_"]
+
+print('Graph size:', len(Gc))
+print('\nCalculating assortativity coefficient by label:')
+for title in comm_titles:
+    labels = [[x] for x in set(nx.get_node_attributes(Gc, title).values())]
+    print('\n{}: {} communities'.format(title, len(labels)))
+    print_assort(Gc, labels, title)
+    
+Gc = None
+```
+
+    Graph size: 18353
+    
+    Calculating assortativity coefficient by label:
+    
+    c_label_prop_asyn: 4209 communities
+    Assortativity Coefficient:  0.144
+    
+    c_label_prop: 188 communities
+    Assortativity Coefficient:  0.579
+    
+    c_fluid: 8 communities
+    Assortativity Coefficient:  0.254
+    
+    c_louvain: 28 communities
+    Assortativity Coefficient:  0.289
+    
+    c_modularity: 65 communities
+    Assortativity Coefficient:  0.305
+
+
+
+```python
+# # Measure the community partitions of a graph using other metrics.
+
+# ##### Example script for other metrics shown here as too demanding to run on notebook server #####
+
+# # Adapted from https://networkx.github.io/documentation/stable/_modules/networkx/algorithms/community/quality.html
+
+# from networkx.algorithms.community import greedy_modularity_communities
+# from networkx.algorithms.community.quality import intra_community_edges, inter_community_non_edges, modularity
+# from networkx.algorithms.community.community_utils import is_partition
+
+# # # Custom performance and coverage functions to avoid running
+# # # intra_community_edges twice.
+# # print('Measuring performance...')
+# # intra_edges = intra_community_edges(G, partition)
+# # inter_edges = inter_community_non_edges(G, partition)
+# # n = len(G)
+# # total_pairs = n * (n - 1)
+# # if not G.is_directed():
+# #     total_pairs //= 2
+# # performance = (intra_edges + inter_edges) / total_pairs
+# #
+# # print('Measuring coverage...')
+# # total_edges = G.number_of_edges()
+# # coverage = intra_edges / total_edges
+# #
+# #
+# # print('Performance: ', performance)
+# # print('Coverage: ', coverage)
+
+```
+
 ### Giant Component Comparison
 Community detection is applied only to the largest component within the graph. This is a limitation of some of the algorithms and is used for all cases for consistency. Coded users which are not part of this largest sub-graph are not assigned a community label. The subgraphs which are not the largest component may isolated nodes or graphs too small to be worth evaulating, or there could be a single second subgraph containing 49% of the nodes. In the latter case, we would need to consider evaluating the strucutre of this graph too. We can check the proportion of nodes within the giant component, the size of the secondary components, and whether non-witness nodes are more likely to be unconnected to the giant component:
 
@@ -652,7 +969,7 @@ create_plot_grid(df_list, axhline=exp_pos_proportion)
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_15_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_26_0.png)
 
 
 From inspecting the graphs above, there appears to be a disproportionate amount of positive cases in certain communities, suggesting some association between community (as detected by a given algorithm) and the classification. Therefore, it is likely that including these metrics will increase the information available to the predictive models.
@@ -1107,7 +1424,7 @@ create_plot_grid(df_list)
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_30_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_0.png)
 
 
 ## Evaluation on Temporal Sub-Graphs
@@ -1414,7 +1731,7 @@ dff
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_37_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_48_1.png)
 
 
 
@@ -1450,7 +1767,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_40_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_51_1.png)
 
 
 
@@ -1464,7 +1781,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_41_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_52_1.png)
 
 
 
@@ -1478,7 +1795,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_42_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_53_1.png)
 
 
 
@@ -1492,7 +1809,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_43_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_54_1.png)
 
 
 
@@ -1506,7 +1823,7 @@ create_plot_grid(series_list)
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_44_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_55_1.png)
 
 
 The stability in the Theil's U and Random Forest metrics suggest that the associations are strong even in smaller graphs. Therefore using these community data throughout the collection process in live classification is a viable strategy. Theil's U measures the fraction of Y (witness labels) we can predict using the community measures. The highest and most stable over time algorithms therefore appear to be c_modularity, c_label_prop_async, and c_louvain. Each of these shows a value of approximately .20-.25 over the course of the collection period.
@@ -2048,7 +2365,7 @@ for c in len(df_list_array):
 ```
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_52_0.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_63_0.png)
 
 
 The community network metrics have now been calculated and added to a copy of the users dataframe for each algorithm, creating a set of enhanced dataframes. The graphs above indicate a potential relationship between the positive ratio and certain centrality measures.
@@ -2122,7 +2439,7 @@ for comm_name in comm_names:
 
 
 
-![png](2_harvey_network_metrics_files/2_harvey_network_metrics_54_1.png)
+![png](2_harvey_network_metrics_files/2_harvey_network_metrics_65_1.png)
 
 
 
