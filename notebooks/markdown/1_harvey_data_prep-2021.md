@@ -8,6 +8,7 @@ Data was collected with custom software which observed several Twitter streams a
 * The keyword stream monitored the terms: [#harvey, #harveystorm, #hurricaneharvey, #corpuschristi]
 * The GPS stream used the bounding box: [-99.9590682, 26.5486063, -93.9790001, 30.3893434]
 * The collection period ran from 2017-08-26 01:32:18 until 2017-09-02 10:30:52 
+* 55,605 Tweets by 33,585 unique authors were recorded
 * 46,872 Tweets by 31,932 unique authors were recorded
 
 Data was coded using an interface built into the collection software by a primary coder. A secondary coder coded a sub-set of coded users for validation of the coding schema. User instances were coded by whether they 'appeared to be in the affected area'.
@@ -18,6 +19,26 @@ These notebooks access the data directly from the database using standard Django
 In this chapter, we will investigate the data which was collected by the custom software. It is assessed for suitability for machine learning approaches, and enriched with synthesised features. The final result is a dataframe which is ready for statistical techniques which are presented in later chapters.
 
 First we get all the coding instances made by the primary and secondary coders, and check the total codings of each class. There may be multiple coding dimensions (sets of coding schema), in which case the code requires adjustment to constrain to one.
+
+
+```python
+for x in range(-1,4):
+    print('Users for class ', x, ': ', User.objects.filter(user_class=x).count())
+for x in range(-1,4):
+    print('Tweets for code ', x, ': ', Tweet.objects.filter(data_source=x).count())
+```
+
+    Users for class  -1 :  0
+    Users for class  0 :  12879507
+    Users for class  1 :  1662
+    Users for class  2 :  30270
+    Users for class  3 :  0
+    Tweets for code  -1 :  0
+    Tweets for code  0 :  1680566
+    Tweets for code  1 :  31303
+    Tweets for code  2 :  0
+    Tweets for code  3 :  15569
+
 
 
 ```python
@@ -277,71 +298,42 @@ def is_local(location, boxes, known_localities=[]):
 # Bounding boxes used for Hurricane Harvey dataset:
 boxes = [[(29.1197,-99.9590682),(26.5486063,-97.5021)],
         [(30.3893434,-97.5021),(26.5486063,-93.9790001)]]
-
 # Don't need to look these up (save on API requests)
 known_localities = ['houston', 'christi']
 
+# Get list of locations in profiles:
 users_df["location"] = users_df["location"].str.lower().str.strip()
+location_list = users_df.location.dropna().unique()
 
-# Use Google maps API to determine locality of a string and export to file.
-# Import from existing file if available to avoid API calls.
-local_file = 'location_list_from_api_local.txt'
-non_local_file = 'location_list_from_api_non_local.txt'
-
-try:
-    local_location_list = []
-    with open(DIR + local_file, 'r') as f:
-        for line in f:
-            local_location_list.append(line.rstrip('\n'))
-    non_local_location_list = []
-    with open(DIR + non_local_file, 'r') as f:
-        for line in f:
-            non_local_location_list.append(line.rstrip('\n'))
-    print("Loaded local locations from file")
-    
-except:
-    # Create sublist of local/non-local locations (non-local only for manual verification)
-    location_list = users_df.location.dropna().unique()
-    print("Running is_local() for {} strings...".format(len(location_list)))
-    local_location_list = [loc for loc in location_list if is_local(loc, boxes, known_localities)]
-    non_local_location_list = [loc for loc in location_list if loc not in local_location_list]
-    # Write lists to file to save calling API on kernel restart:
-    with open(DIR + local_file, 'w') as f:
-        for item in local_location_list:
-            f.write("%s\n" % item)
-    with open(DIR + non_local_file, 'w') as f:
-        for item in non_local_location_list:
-            f.write("%s\n" % item)
+# Create sublist of local/non-local locations (non-local only for manual verification)
+print("Running is_local() for {} strings...".format(len(location_list)))
+local_location_list = [loc for loc in location_list if is_local(loc, boxes, known_localities)]
+non_local_location_list = [loc for loc in location_list if loc not in local_location_list]
 
 # Create column for users with local location listed in profile
-users_df['is_local_profile_location'] = users_df.location.str.lower().isin(local_location_list)
-users_df['is_non_local_profile_location'] = users_df.location.str.lower().isin(non_local_location_list)
+users_df['local_profile_location'] = users_df.location.str.lower().isin(local_location_list)
+
+# Write lists to file to save calling API on kernel restart:
+with open(DIR + 'location_list_from_api_local.txt', 'w') as f:
+    for item in local_location_list:
+        f.write("%s\n" % item)
+with open(DIR + 'location_list_from_api_non_local.txt', 'w') as f:
+    for item in non_local_location_list:
+        f.write("%s\n" % item)
 ```
-
-    Loaded local locations from file
-
 
 
 ```python
-# Check the proportions. Note that some of the 'Non-local' classifications are based on strings
-# which could not be parsed as locations, so are better thought of as 'not identified as local'
-
-tot = len(users_df)
-loc = sum(users_df.is_local_profile_location)
-non_loc = sum(users_df.is_non_local_profile_location)
-undef = len(users_df) - sum((users_df.is_non_local_profile_location | users_df.is_local_profile_location))
-
-print('Local: {}, {:.3}%'.format(loc, loc/tot*100))
-print('Non-Local: {}, {:.3}%'.format(non_loc, non_loc/tot*100))
-print('No location listed: {}, {:.3}%'.format(undef, undef/tot*100))
+# Use cached locations instead of querying API:
+#users_df["location"] = users_df["location"].str.lower().str.strip()
+#local_location_list_cached = []
+#with open('data/harvey_user_location/location_list_from_api_local.txt', 'r') as f:
+#    for line in f:
+#        local_location_list_cached.append(line.rstrip('\n'))
+#users_df['local_profile_location'] = users_df.location.str.lower().isin(local_location_list)
 ```
 
-    Local: 397, 26.5%
-    Non-Local: 794, 52.9%
-    No location listed: 309, 20.6%
-
-
-# Timezone Field
+### Timezone Field
 Timezone data provided by Twitter when capturing the user objects is less specific than other methods, but may be useful as a supplementary source.
 As this data field has been deprecated by Twitter, it will not be available in new data sets.
 
@@ -350,9 +342,9 @@ As this data field has been deprecated by Twitter, it will not be available in n
 # View most prevalent time zones:
 print(users_df['time_zone'].value_counts().head())
 
-# Create column for profiles in relevant time zone (chosen manually based on the observed event):
-RELEVANT_TIMEZONE = 'Central Time (US & Canada)'
-users_df['is_local_timezone'] = users_df.time_zone == RELEVANT_TIMEZONE
+# Create column for profiles in relevant time zone (chosen manually):
+relevant_timezone = 'Central Time (US & Canada)'
+users_df['local_timezone'] = users_df.time_zone == relevant_timezone
 users_df = users_df.drop(['time_zone', 'utc_offset'], axis=1)
 ```
 
@@ -376,15 +368,11 @@ users_df['coded_as'] = \
     users_df['screen_name'].apply(lambda x: account_codings.get(user__screen_name = x).data_code.name)
 
 # Convert to one-hot encoding
-users_df['is_coded_as_witness'] = users_df['coded_as'] == 'Witness'
-users_df['is_coded_as_non_witness'] = users_df['coded_as'] == 'Non-Witness'
+users_df['coded_as_witness'] = users_df['coded_as'] == 'Witness'
+users_df['coded_as_non_witness'] = users_df['coded_as'] == 'Non-Witness'
 
 # Remove original column:
 users_df = users_df.drop(['coded_as'], axis=1)
-
-# Note: Two columns are used as there is a third value of 'unsure'
-# This could be merged into one of the columns if preferred.
-# print('Third code count: ', sum(~users_df['coded_as_witness'] & ~users_df['coded_as_non_witness']))
 ```
 
 The 'Unsure' code is represented as `False` values in both the `coded_as_witness` and `coded_as_non_witness` columns. If the 'Unsure' rows are removed, we can also remove the `coded_as_non_witness` column (which is now represented as `False` in the `coded_as_witness` column).
@@ -395,17 +383,15 @@ While the Tweets detected by the system may not contain GPS data, the author may
 
 
 ```python
-# Check whether any of a user's Tweets fall within the bounding box and update column.
-# has_tweet_from_locality == True if ANY of a user's Tweets fall within the box.
-# Note: This will take several minutes to run
+# Check whether any of a user's Tweets fall within the bounding box and update column:
+# This will take several minutes to run
 
-users_df['has_tweet_from_locality'] = False
-users_list = users_df.screen_name.tolist()
+users_df['tweet_from_locality'] = False
+users = users_df.screen_name.tolist()
 
-for i in range(len(users_list)):
-    u = users_list[i]
+for i in range(len(users)):
     if i%100 == 0:
-        print('Progress: {} of {}: {}'.format(i, len(users_list), u))
+        print('Progress: {} of {}: {}'.format(i, len(users)))
     try:
         geo_tweets = User.objects.get(screen_name=u).tweet.filter(coordinates_lat__isnull=False)
     except:
@@ -414,25 +400,163 @@ for i in range(len(users_list)):
     for tweet in geo_tweets:
         coords = (tweet.coordinates_lat, tweet.coordinates_lon)
         if is_in_bounding_box(coords, boxes):
-            users_df.loc[users_df['screen_name'] == u, 'has_tweet_from_locality'] = True
+            users_df.loc[users_df['screen_name'] == u, 'tweet_from_locality'] = True
             break
 ```
 
-    Progress: 0 of 1500: LiveHappySA
-    Progress: 100 of 1500: thehalfwayj
-    Progress: 200 of 1500: polvogt
-    Progress: 300 of 1500: charmgirl13
-    Progress: 400 of 1500: eodpenguin
-    Progress: 500 of 1500: lrixford
-    Progress: 600 of 1500: SWJOCOCERT
-    Progress: 700 of 1500: thereal4speed
-    Progress: 800 of 1500: dschexnaydre
-    Progress: 900 of 1500: YPEatingwStyle
-    Progress: 1000 of 1500: KyleColby
-    Progress: 1100 of 1500: catchtheteaTV
-    Progress: 1200 of 1500: FranaldoCurl
-    Progress: 1300 of 1500: KosmosEnergy
-    Progress: 1400 of 1500: MsDimplez2u
+    1500
+    User 10 of 1500: ChristiWilliams
+    User 20 of 1500: OliviaFett
+    User 30 of 1500: UHhousing
+    User 40 of 1500: SmallTownDicks
+    User 50 of 1500: WmBrockschmidt
+    User 60 of 1500: marc_ahx
+    User 70 of 1500: TamaraChanel
+    User 80 of 1500: VotersDemand
+    User 90 of 1500: MC_Halo687
+    User 100 of 1500: TheBlazeKari
+    User 110 of 1500: Ambersallin
+    User 120 of 1500: Hamal
+    User 130 of 1500: JMarkMcGinnis
+    User 140 of 1500: deleon_sarita
+    User 150 of 1500: meaneyreport
+    User 160 of 1500: touchawe
+    User 170 of 1500: Devil_dog_71
+    User 180 of 1500: 2020Jobs
+    User 190 of 1500: stevenmaislin
+    User 200 of 1500: bquentin3
+    Error with user:  TCAIS
+    User 210 of 1500: Oscarluism_
+    User 220 of 1500: hillarybeth
+    Error with user:  SEFLCareers
+    User 230 of 1500: homesteadraised
+    User 240 of 1500: ArmyBtownAD
+    User 250 of 1500: MagentaMelee
+    User 260 of 1500: thepaigelewis
+    User 270 of 1500: meVschristina
+    User 280 of 1500: AvvBrosisky
+    User 290 of 1500: JeremiahWheele1
+    User 300 of 1500: KurtLKrieger
+    User 310 of 1500: TrueDumbBlonde
+    User 320 of 1500: MrAbdelLHS
+    User 330 of 1500: LandlordLinks
+    User 340 of 1500: gfbakery2014
+    User 350 of 1500: JCP803
+    User 360 of 1500: GinoMerlot
+    User 370 of 1500: MeSSiaH_808
+    User 380 of 1500: callinlexie
+    User 390 of 1500: nikkinik528
+    User 400 of 1500: JNLIII
+    User 410 of 1500: IntentionallyKB
+    User 420 of 1500: ezoptical
+    User 430 of 1500: CabriLuigi
+    User 440 of 1500: Bo_Wright
+    User 450 of 1500: itzshelleybell
+    User 460 of 1500: RWonMaui
+    User 470 of 1500: Felixcalvince
+    User 480 of 1500: PatMateluna
+    User 490 of 1500: petermlotzemd1
+    User 500 of 1500: IAmRobWu
+    User 510 of 1500: TeviTroy
+    User 520 of 1500: lovelyalica_
+    User 530 of 1500: BizarroLuthor
+    User 540 of 1500: austintindle
+    User 550 of 1500: 2GrkGrls
+    User 560 of 1500: weapon83
+    User 570 of 1500: corgli
+    User 580 of 1500: Heat975Action
+    User 590 of 1500: SequoiaRE_EB
+    User 600 of 1500: guss813
+    User 610 of 1500: fatrat282
+    User 620 of 1500: WendyFinneyWood
+    User 630 of 1500: JohnnyKey_AR
+    User 640 of 1500: SNSPP_PATS_FO_
+    User 650 of 1500: NJS4EVER
+    User 660 of 1500: ntebdwa
+    User 670 of 1500: y81de
+    User 680 of 1500: JackieSGolf
+    User 690 of 1500: ThingsToShea
+    User 700 of 1500: dallasreese
+    User 710 of 1500: TurkWarfield
+    User 720 of 1500: KaruniaAgung
+    User 730 of 1500: catsterle
+    User 740 of 1500: Jonathan4743
+    User 750 of 1500: joal1969
+    User 760 of 1500: youremysonshine
+    User 770 of 1500: s_mellors
+    User 780 of 1500: iamluvlady
+    User 790 of 1500: MerrisBadcock
+    User 800 of 1500: VictoriaBBurns
+    User 810 of 1500: Margaret8OK
+    User 820 of 1500: vicentearenastv
+    User 830 of 1500: golivent1
+    User 840 of 1500: ConmayS
+    User 850 of 1500: EthanEmeryWX
+    User 860 of 1500: LeahKWilliams
+    User 870 of 1500: sameolg713
+    User 880 of 1500: yanaincali
+    User 890 of 1500: ChannelE2E
+    User 900 of 1500: DJDLuxTx
+    User 910 of 1500: SWELGL
+    User 920 of 1500: abestesq
+    User 930 of 1500: kyle_reidy
+    User 940 of 1500: dontgruberme
+    User 950 of 1500: BaneSaysTrump
+    User 960 of 1500: dariameetsworld
+    User 970 of 1500: SharpstownTX
+    User 980 of 1500: RogueSquadronMC
+    User 990 of 1500: shortmotivation
+    User 1000 of 1500: DanielMoralesTV
+    User 1010 of 1500: rcantu
+    User 1020 of 1500: ZestyOrangePic
+    User 1030 of 1500: ElenaRsv
+    User 1040 of 1500: BeyondBlunt
+    User 1050 of 1500: biominer86
+    User 1060 of 1500: MikeImken
+    User 1070 of 1500: Rosa_Sherrod
+    User 1080 of 1500: wifeofJW
+    User 1090 of 1500: AndreaROMANIN1
+    User 1100 of 1500: TheBarkingPigTX
+    User 1110 of 1500: lesleymesser
+    User 1120 of 1500: Renate651
+    User 1130 of 1500: BarryMyhawginya
+    User 1140 of 1500: PepperBurns1
+    User 1150 of 1500: RedPoliticalMan
+    User 1160 of 1500: MrsBoothSays
+    User 1170 of 1500: Foundry_HB
+    User 1180 of 1500: VenatoreMedia
+    User 1190 of 1500: KimiKentMusic
+    User 1200 of 1500: SociologyofCC
+    User 1210 of 1500: mlweldon5
+    User 1220 of 1500: _ItEndsNow_
+    User 1230 of 1500: LexeyJohnson
+    User 1240 of 1500: not_DonnyTrump
+    User 1250 of 1500: plsimmo
+    User 1260 of 1500: lillamb1997
+    User 1270 of 1500: JayleenHeft
+    User 1280 of 1500: PrayerPictures
+    User 1290 of 1500: HoustonISDGov
+    User 1300 of 1500: BrownsteinHyatt
+    User 1310 of 1500: olivesjoy
+    User 1320 of 1500: bellinissima
+    User 1330 of 1500: SUSANIRELAND4
+    User 1340 of 1500: onlndtng_sucks
+    User 1350 of 1500: DiscoverDior
+    User 1360 of 1500: SMLaughna
+    User 1370 of 1500: TweetsfromMsB
+    User 1380 of 1500: ConveyerOfCool
+    User 1390 of 1500: ocuellar10
+    User 1400 of 1500: BusinessMoney5
+    User 1410 of 1500: Ejwhite0
+    User 1420 of 1500: Justin_Horne
+    User 1430 of 1500: t3hasian
+    User 1440 of 1500: palomaresjl
+    User 1450 of 1500: SMUTexasMexico
+    User 1460 of 1500: WeAreGoLocal
+    User 1470 of 1500: ScoopALoop3
+    User 1480 of 1500: JennyWCVB
+    User 1490 of 1500: GalvHistory
+    User 1500 of 1500: acman2k6
 
 
 ###  Temporary Export
@@ -442,11 +566,10 @@ The dataframe is exported to a csv file before further manipulation (and column 
 ```python
 import pandas as pd
 filename = 'df_users_interim.csv'
-path = DIR + filename
 
 # Sanitise description field:
 users_df["description"] = users_df["description"].str.replace("\r", " ")
-users_df.to_csv(path)
+users_df.to_csv(DIR + filename)
 ```
 
 
@@ -458,7 +581,6 @@ if users_df_temp.shape == orig_shape:
     users_df = users_df_temp
 else:
     print("Shape mis-match. Check string sanitisation")
-path = None
 ```
 
 ## Data Enrichment
@@ -520,7 +642,7 @@ users_df['description_length'] = users_df.description.str.len()
 #users_df = users_df.drop(['description_length'], axis=1)
 
 # Profile language is English:
-users_df['is_lang_en'] = users_df['lang'] == 'en'
+users_df['lang_is_en'] = users_df['lang'] == 'en'
 users_df = users_df.drop(['lang'], axis=1)
 
 # translator_type exists:
@@ -531,7 +653,7 @@ users_df = users_df.drop(['translator_type'], axis=1)
 users_df['has_url'] = users_df['url'].notnull()
 
 # User has changed screen_name during collection period:
-users_df['has_changed_screen_name'] = users_df['old_screen_name'].notnull()
+users_df['changed_screen_name'] = users_df['old_screen_name'].notnull()
 ```
 
 We check for columns which should be represented categorically by counting the unique values in each column (under the assumption that categorical variables will have fewer than 20 unique values):
@@ -589,195 +711,23 @@ for col in users_df.columns:
     has_extended_profile
     is_translation_enabled
     verified
-    is_local_profile_location
-    is_local_timezone
-    is_coded_as_witness
-    is_coded_as_non_witness
-    has_tweet_from_locality
-    is_lang_en
+    local_profile_location
+    local_timezone
+    coded_as_witness
+    coded_as_non_witness
+    tweet_from_locality
+    lang_is_en
     has_translator_type
     has_url
-    has_changed_screen_name
+    changed_screen_name
     is_data_source_3
-
-
-
-```python
-# Move target columns to end of dataframe:
-target_cols = ['is_coded_as_witness', 'is_coded_as_non_witness']
-
-cols = list(users_df.columns.values)
-for col in target_cols:
-    cols.remove(col)
-users_df = users_df[cols + target_cols]
-```
-
-
-
-
-<div>
-<table border="1" class="dataframe">
-  <thead>
-    <tr style="text-align: right;">
-      <th></th>
-      <th>added_at</th>
-      <th>centrality_betweenness</th>
-      <th>centrality_closeness</th>
-      <th>centrality_degree</th>
-      <th>centrality_eigenvector</th>
-      <th>centrality_load</th>
-      <th>centrality_undirected_eigenvector</th>
-      <th>created_at</th>
-      <th>default_profile</th>
-      <th>default_profile_image</th>
-      <th>...</th>
-      <th>account_age</th>
-      <th>day_of_detection</th>
-      <th>description_length</th>
-      <th>is_lang_en</th>
-      <th>has_translator_type</th>
-      <th>has_url</th>
-      <th>has_changed_screen_name</th>
-      <th>is_data_source_3</th>
-      <th>is_coded_as_witness</th>
-      <th>is_coded_as_non_witness</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <th>0</th>
-      <td>2017-08-28 20:42:59.273657+00:00</td>
-      <td>0.000043</td>
-      <td>0.135798</td>
-      <td>0.000304</td>
-      <td>3.905631e-07</td>
-      <td>0.000048</td>
-      <td>5.377061e-05</td>
-      <td>2013-03-01 19:23:11+00:00</td>
-      <td>0</td>
-      <td>0</td>
-      <td>...</td>
-      <td>1645</td>
-      <td>3</td>
-      <td>96.0</td>
-      <td>1</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>1</th>
-      <td>2017-08-30 13:58:20.296918+00:00</td>
-      <td>0.000015</td>
-      <td>0.122066</td>
-      <td>0.000243</td>
-      <td>1.785776e-07</td>
-      <td>0.000019</td>
-      <td>2.210768e-06</td>
-      <td>2014-01-20 00:34:57+00:00</td>
-      <td>1</td>
-      <td>0</td>
-      <td>...</td>
-      <td>1321</td>
-      <td>5</td>
-      <td>124.0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>2</th>
-      <td>2017-08-26 19:51:45.107222+00:00</td>
-      <td>0.000000</td>
-      <td>0.077120</td>
-      <td>0.000061</td>
-      <td>8.518251e-14</td>
-      <td>0.000000</td>
-      <td>7.589479e-11</td>
-      <td>2012-07-24 13:47:47+00:00</td>
-      <td>0</td>
-      <td>0</td>
-      <td>...</td>
-      <td>1865</td>
-      <td>1</td>
-      <td>134.0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>3</th>
-      <td>2017-08-26 11:13:05.769123+00:00</td>
-      <td>0.000383</td>
-      <td>0.167070</td>
-      <td>0.000668</td>
-      <td>4.315565e-05</td>
-      <td>0.000388</td>
-      <td>3.327919e-04</td>
-      <td>2010-12-16 17:30:04+00:00</td>
-      <td>0</td>
-      <td>0</td>
-      <td>...</td>
-      <td>2451</td>
-      <td>1</td>
-      <td>128.0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-    <tr>
-      <th>4</th>
-      <td>2017-08-26 14:19:23.604361+00:00</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>NaN</td>
-      <td>2009-04-24 12:08:14+00:00</td>
-      <td>0</td>
-      <td>0</td>
-      <td>...</td>
-      <td>3052</td>
-      <td>1</td>
-      <td>136.0</td>
-      <td>1</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>0</td>
-      <td>1</td>
-    </tr>
-  </tbody>
-</table>
-<p>5 rows × 46 columns</p>
-</div>
-
 
 
 ## Export to File
 
 
 ```python
-path = DIR + DF_FILENAME
-
-users_df.to_csv(path)
+users_df.to_csv(DIR + DF_FILENAME)
 
 # Re-import and check rows match:
 orig_shape = users_df.shape
@@ -792,10 +742,5 @@ else:
 ```
 
     Dataframe exported to CSV.
-    (1500, 46)
+    (1500, 45)
 
-
-
-```python
-
-```
