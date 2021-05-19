@@ -1,6 +1,6 @@
 # Crisis-Analysis
 Quantitative analysis of crisis events as part of D.Phil project at Oxford.
-Markdown copies are included for viewing from within GitHub.
+
 These are considered works-in-progress.
 
 ## Research Question
