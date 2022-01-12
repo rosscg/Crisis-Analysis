@@ -4,13 +4,14 @@ cd "${BASH_SOURCE%/*}"
 #
 # # Copy all notebooks, and png files in an img folders.
 rsync -rPz --include="*.ipynb" --include="*/img/*.png" --exclude="/notes/" --exclude="*.*" --delete-excluded rosles@gales.cs.ox.ac.uk:projects/crisis-data/notebooks/ notebooks/
-#
-#
-# # Create Markdown copies of notebooks for Github viewing
+# Remove empty directories (i.e. where contents were excluded)
+find . -empty -type d -delete
+
+
+# # Create Markdown copies of notebooks for Github viewing (No longer needed)
 # rm -rf ./notebooks/markdown/*
 # jupyter nbconvert --output-dir='./notebooks/markdown' --to markdown notebooks/*.ipynb
 # cp -r ./notebooks/data ./notebooks/markdown/data
-#
 
 # Remove style tag contents from .md files as they do not render on Github:
 # python3 <<EOF
